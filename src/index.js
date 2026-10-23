@@ -4,7 +4,7 @@ import qrcodeTerminal from 'qrcode-terminal'
 import { grupoAtivo, identificarTopico, configurarGrupo, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
-import { vincularConta, inscricaoDoJid } from './vinculo.js'
+import { vincularConta, inscricaoDoJid, vincularPorNumero } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 
@@ -190,6 +190,30 @@ async function connectToWhatsApp() {
       await processarPedidoEntrada(sock, req.id, req.participant)
     } catch (erro) {
       console.error('pedido de entrada:', erro)
+    }
+  })
+
+  // Quem é adicionada na mão por uma admin (sem pedido de entrada) não passa
+  // pelo link/token — tenta reconhecer pelo número de WhatsApp da inscrição.
+  sock.ev.on('group-participants.update', async (update) => {
+    if (update.action !== 'add') return
+    try {
+      const topico = await identificarTopico(update.id)
+      if (!topico) return
+      for (const participantJid of update.participants) {
+        if (await inscricaoDoJid(participantJid)) continue
+        const encontrada = await vincularPorNumero(sock, participantJid)
+        if (encontrada) {
+          const nome = encontrada.apelido || encontrada.nome
+          try {
+            await sock.sendMessage(participantJid, { text: `Oii ${nome}! Reconheci seu número e já vinculei sua conta ao Farol 💛` })
+          } catch (erro) {
+            console.error('aviso de vínculo automático:', erro)
+          }
+        }
+      }
+    } catch (erro) {
+      console.error('vincular por número:', erro)
     }
   })
 

@@ -37,6 +37,46 @@ export async function vincularConta(jid, token) {
   return { ok: true, apelido: cadastro.apelido || cadastro.nome }
 }
 
+function normalizarNumero(numero) {
+  let digitos = String(numero || '').replace(/\D/g, '')
+  if (!digitos) return null
+  if (digitos.length <= 11) digitos = '55' + digitos // sem DDI: assume Brasil
+  return digitos
+}
+
+// Plano B pra quem é adicionada na mão no grupo (sem passar pelo link/token):
+// reconhece pelo número de WhatsApp que a pessoa informou na inscrição.
+export async function vincularPorNumero(sock, jid) {
+  const { data: candidatos } = await supabase
+    .from('signups')
+    .select('id, whatsapp, apelido, nome')
+    .eq('status', 'aprovado')
+    .not('whatsapp', 'is', null)
+  if (!candidatos?.length) return null
+
+  const { data: existentes } = await supabase.from('whatsapp_membros').select('jid, signup_id').is('removido_em', null)
+  const idsVinculados = new Set((existentes ?? []).map((v) => v.signup_id))
+  if ((existentes ?? []).some((v) => v.jid === jid)) return null // já vinculada
+
+  for (const c of candidatos) {
+    if (idsVinculados.has(c.id)) continue
+    const numero = normalizarNumero(c.whatsapp)
+    if (!numero) continue
+    try {
+      const [resultado] = await sock.onWhatsApp(numero)
+      if (resultado?.exists && (resultado.jid === jid || resultado.lid === jid)) {
+        await supabase
+          .from('whatsapp_membros')
+          .upsert({ jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10) }, { onConflict: 'jid' })
+        return c
+      }
+    } catch (erro) {
+      console.error('vincularPorNumero:', erro)
+    }
+  }
+  return null
+}
+
 // A inscrição aprovada ligada a esse jid (ou null).
 export async function inscricaoDoJid(jid) {
   const { data } = await supabase
