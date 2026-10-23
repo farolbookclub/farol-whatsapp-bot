@@ -14,6 +14,8 @@ import { iniciarGuia, tentarAvancarGuia } from './guia.js'
 import { perguntarIA } from './ia.js'
 import { membrosFaltando, processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
+import { processarAutolinkPendentes } from './autolink.js'
+import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -145,6 +147,15 @@ async function handleGroupMessage(sock, m, groupJid) {
     texto2 += naoNoGrupo.length ? `Aprovadas e vinculadas, mas não estão aqui (${naoNoGrupo.length}):\n${naoNoGrupo.join(', ')}` : 'Todas as vinculadas já estão aqui 💛'
     if (semVinculo.length) texto2 += `\n\nAprovadas mas ainda sem WhatsApp vinculado (${semVinculo.length}):\n${semVinculo.join(', ')}`
     await sock.sendMessage(groupJid, { text: texto2 })
+    return
+  }
+
+  if (/^!novocodigo$/i.test(texto)) {
+    const meta = await sock.groupMetadata(groupJid)
+    const admin = meta.participants.find((p) => p.id === participant)?.admin
+    if (!admin) return
+    const erro = await pedirNovoCodigo()
+    await sock.sendMessage(groupJid, { text: erro ? `Não consegui trocar o código: ${erro}` : 'Trocando o código... já posto aqui em instantes 🔑' })
     return
   }
 
@@ -379,5 +390,15 @@ setInterval(() => {
 setInterval(() => {
   if (sockAtual) processarRemocoesPendentes(sockAtual).catch((e) => console.error('processar remoções:', e))
 }, 15 * 1000)
+
+// Vínculo automático por número, pedido pelo painel admin: checa a cada 15s.
+setInterval(() => {
+  if (sockAtual) processarAutolinkPendentes(sockAtual).catch((e) => console.error('processar autolink:', e))
+}, 15 * 1000)
+
+// Código do site trocado (rotação automática ou !novocodigo): checa a cada 30s.
+setInterval(() => {
+  if (sockAtual) checarCodigoPendente(sockAtual).catch((e) => console.error('checar código:', e))
+}, 30 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)

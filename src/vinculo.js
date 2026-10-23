@@ -37,7 +37,7 @@ export async function vincularConta(jid, token) {
   return { ok: true, apelido: cadastro.apelido || cadastro.nome, formato: cadastro.formato }
 }
 
-function normalizarNumero(numero) {
+export function normalizarNumero(numero) {
   let digitos = String(numero || '').replace(/\D/g, '')
   if (!digitos) return null
   if (digitos.length <= 11) digitos = '55' + digitos // sem DDI: assume Brasil
