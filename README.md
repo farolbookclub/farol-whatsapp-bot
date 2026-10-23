@@ -41,9 +41,24 @@ Dentro de cada grupo do WhatsApp (Avisos, Bate-papo, Leitura do mês, Presencial
 
 No site, o link "Entrar no WhatsApp" abre uma conversa com o número do bot já preenchida com `/start <token>` (mesmo token da página Minha inscrição). A pessoa só precisa mandar a mensagem.
 
+Se a admin adicionar alguém na mão (sem pedido de entrada), o bot tenta reconhecer sozinho pelo número de WhatsApp que a pessoa informou na inscrição.
+
 ## Comandos
 
 - `/resumo`, `/resumo_leitura`, `/resumo_avisos`, `/resumo_presencial` — dentro do grupo ou no privado.
+- `/spoiler` (no privado) — manda o último spoiler guardado do tópico Leitura do mês.
+
+## Spoiler
+
+No tópico Leitura do mês, quem comentar algo com spoiler escreve `SPOILER` + onde está na leitura + o comentário. O bot apaga a mensagem do grupo (precisa ser admin) e guarda pra mandar só a quem pedir `/spoiler` no privado. Se for imagem, a orientação é mandar como visualização única (não tem como o bot gerenciar isso).
+
+## Aviso de progresso de leitura
+
+Quando alguém atualiza o progresso ou avalia no site, o bot posta automaticamente no grupo Leitura do mês (confere a cada 1 minuto) — sem revelar comentário, só avisa que tem novidade e manda pro site.
+
+## Avisar todas (painel admin)
+
+O botão "Avisar todas no WhatsApp" do painel grava um pedido no banco; o bot confere a cada 30s e manda a mensagem no privado de cada integrante vinculada, uma de cada vez com 5s de intervalo (pra não levar bloqueio por flood). O painel mostra o progresso e quem não recebeu (e por quê).
 
 ## Se a internet cair
 
