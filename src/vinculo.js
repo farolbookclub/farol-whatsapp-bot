@@ -8,11 +8,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export async function vincularConta(jid, token) {
   if (!UUID.test(token)) return null
 
-  const { data: cadastro } = await supabase
+  const { data: cadastro, error: erroCadastro } = await supabase
     .from('signups')
     .select('id, status, nome, apelido')
     .eq('confirmation_token', token)
     .maybeSingle()
+  if (erroCadastro) console.error('vincularConta (buscar signup):', erroCadastro.message, erroCadastro.code)
   if (!cadastro) return { ok: false, texto: 'Esse link não é válido. Abra de novo a página Minha inscrição e use o botão de lá.' }
   if (cadastro.status !== 'aprovado') {
     return {
