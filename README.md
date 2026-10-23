@@ -14,14 +14,16 @@ Bot do Farol Book Club pro WhatsApp (usa [Baileys](https://github.com/WhiskeySoc
    npm install
    ```
 3. Copia `.env.example` pra `.env` e preenche:
-   - `SUPABASE_SERVICE_ROLE_KEY` — pega no painel do Supabase (Project Settings → API).
-   - `GROQ_API_KEY` — a mesma chave já usada no bot do Telegram.
+   - `SUPABASE_SERVICE_ROLE_KEY` — pega no painel do Supabase (Project Settings → API Keys → secret).
+   - `GROQ_API_KEY` — a mesma chave já usada no bot do Telegram, ou gera uma nova em console.groq.com/keys.
+   - `WHATSAPP_PHONE_NUMBER` — se o WhatsApp estiver no mesmo celular que roda o bot (não dá pra escanear QR da própria tela), preenche com o número do chip (DDI+DDD, só números, ex: `5511999999999`).
 4. Roda:
    ```
    termux-wake-lock
    npm start
    ```
-5. Aparece um QR code no terminal — abre o WhatsApp no número novo (o chip), vai em **Aparelhos conectados → Conectar um aparelho** e escaneia.
+5. **Com `WHATSAPP_PHONE_NUMBER` preenchido:** aparece um código de 8 dígitos no terminal. No WhatsApp: **Aparelhos conectados → Conectar um aparelho → Conectar com número de telefone** → digita o código.
+   **Sem `WHATSAPP_PHONE_NUMBER`** (WhatsApp em outro aparelho): aparece um QR code — escaneia normalmente em **Aparelhos conectados → Conectar um aparelho**.
 6. Pronto, fica rodando. Pra deixar persistente mesmo fechando o Termux, roda dentro de uma sessão `tmux` (`pkg install tmux`, depois `tmux new -s faroleiro`, roda o `npm start` lá dentro, e sai com `Ctrl+B` depois `D` sem matar a sessão).
 
 ## Configurando os grupos

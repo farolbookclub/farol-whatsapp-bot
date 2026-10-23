@@ -6,6 +6,7 @@ import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
 import { vincularConta, inscricaoDoJid } from './vinculo.js'
 import { supabase } from './supabase.js'
+import { WHATSAPP_PHONE_NUMBER } from './config.js'
 
 const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💛 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
 
@@ -152,9 +153,23 @@ async function connectToWhatsApp() {
 
   sock.ev.on('creds.update', saveCreds)
 
+  // Primeira vez (ainda não registrado): se tiver o número configurado, pede
+  // código de pareamento em vez de depender do QR (não dá pra escanear QR
+  // com a câmera do mesmo celular que mostra ele na tela).
+  if (!sock.authState.creds.registered && WHATSAPP_PHONE_NUMBER) {
+    setTimeout(async () => {
+      try {
+        const codigo = await sock.requestPairingCode(WHATSAPP_PHONE_NUMBER)
+        console.log(`\nCódigo de pareamento: ${codigo}\nNo WhatsApp: Aparelhos conectados → Conectar um aparelho → Conectar com número de telefone → digita esse código.\n`)
+      } catch (erro) {
+        console.error('pedir código de pareamento:', erro)
+      }
+    }, 3000)
+  }
+
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
-    if (qr) qrcodeTerminal.generate(qr, { small: true })
+    if (qr && !WHATSAPP_PHONE_NUMBER) qrcodeTerminal.generate(qr, { small: true })
     if (connection === 'close') {
       const motivo = lastDisconnect?.error?.output?.statusCode
       const deslogado = motivo === DisconnectReason.loggedOut
