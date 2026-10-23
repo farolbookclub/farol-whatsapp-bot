@@ -11,6 +11,7 @@ import { checarProgressoLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { PADRAO_SPOILER, guardarSpoiler, buscarUltimoSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia } from './guia.js'
+import { perguntarIA } from './ia.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -78,6 +79,40 @@ async function comandoResumo(sock, jid, topicoForcado) {
   await gerarEEnviarResumo(sock, jid, topicoForcado || 'bate_papo')
 }
 
+function meuNumero(sock) {
+  return String(sock.user?.id || '').split(':')[0].split('@')[0]
+}
+
+// Mesma regra do Telegram: responde a pergunta pra IA só quando mencionam o
+// bot ou respondem a uma resposta dela (não a avisos automáticos do bot).
+async function responderSeMencionado(sock, m, jid) {
+  const texto = textoDaMensagem(m)
+  const contextInfo = m.message?.extendedTextMessage?.contextInfo
+  const meu = meuNumero(sock)
+  const mencionou = (contextInfo?.mentionedJid || []).some((j) => j.split('@')[0] === meu)
+
+  const participanteOriginal = contextInfo?.participant
+  const quotedMsg = contextInfo?.quotedMessage
+  const textoQuotado = quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || ''
+  const avisoAutomatico = /^(Pronto, você entrou|Oii .+! (Conta vinculada|Reconheci)|🤫|📖|✨ Resumo|Agora é só entrar|Nossa comunidade|Responda Ok)/.test(textoQuotado)
+  const respondeuBot = participanteOriginal && participanteOriginal.split('@')[0] === meu && !avisoAutomatico
+
+  if (!mencionou && !respondeuBot) return
+
+  const pergunta = texto.replace(/@\d+/g, '').trim() || '(a pessoa só mencionou o Faroleiro, sem pergunta)'
+  let conteudo = pergunta
+  if (textoQuotado) {
+    conteudo = (respondeuBot ? `Sua mensagem anterior: "${textoQuotado}"` : `Mensagem que ela está respondendo: "${textoQuotado}"`) + `\n\nMensagem dela: ${pergunta}`
+  }
+
+  try {
+    const resposta = await perguntarIA(jid, conteudo)
+    if (resposta) await sock.sendMessage(jid, { text: resposta, quoted: m })
+  } catch (erro) {
+    console.error('IA (grupo):', erro)
+  }
+}
+
 async function handleGroupMessage(sock, m, groupJid) {
   const texto = textoDaMensagem(m).trim()
   const participant = m.key.participant
@@ -126,6 +161,8 @@ async function handleGroupMessage(sock, m, groupJid) {
     apelido: m.pushName || 'alguém',
     texto,
   })
+
+  await responderSeMencionado(sock, m, groupJid)
 }
 
 async function handleDM(sock, m, jid) {
@@ -182,7 +219,20 @@ async function handleDM(sock, m, jid) {
   }
 
   const inscricao = await inscricaoDoJid(jid)
-  if (!inscricao) await sock.sendMessage(jid, { text: AJUDA })
+  if (!inscricao) {
+    await sock.sendMessage(jid, { text: AJUDA })
+    return
+  }
+
+  // Mensagem livre de quem já é integrante: trata como pergunta pra IA.
+  if (texto) {
+    try {
+      const resposta = await perguntarIA(jid, texto)
+      if (resposta) await sock.sendMessage(jid, { text: resposta })
+    } catch (erro) {
+      console.error('IA (privado):', erro)
+    }
+  }
 }
 
 async function connectToWhatsApp() {
