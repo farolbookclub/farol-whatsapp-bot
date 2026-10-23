@@ -119,14 +119,15 @@ async function leituraDasMembras(bookId) {
 }
 
 async function leiturasAnteriores() {
-  const { data: livros } = await supabase
+  const { data: todos } = await supabase
     .from('books')
-    .select('id, title, author, reading_start_date')
+    .select('id, title, author, reading_start_date, is_extra, extra_mostra_historico')
     .eq('is_current', false)
     .or('is_draft.is.null,is_draft.eq.false')
     .order('reading_start_date', { ascending: false })
     .limit(24)
-  if (!livros?.length) return []
+  const livros = (todos ?? []).filter((l) => !l.is_extra || l.extra_mostra_historico !== false)
+  if (!livros.length) return []
 
   const { data: avaliacoes } = await supabase
     .from('public_ratings')
@@ -134,12 +135,12 @@ async function leiturasAnteriores() {
     .in('book_id', livros.map((l) => l.id))
 
   const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-  const linhas = ['', 'LEITURAS ANTERIORES (da mais recente pra mais antiga):']
+  const linhas = ['', 'LEITURAS ANTERIORES (da mais recente pra mais antiga; "(extra)" = foi leitura extra, não leitura do mês oficial):']
   for (const l of livros) {
     const [ano, mes] = String(l.reading_start_date || '').slice(0, 10).split('-').map(Number)
     const quando = ano && mes ? ` (${meses[mes - 1]}/${ano})` : ''
     const m = mediaNotas((avaliacoes ?? []).filter((a) => a.book_id === l.id))
-    linhas.push(`- ${l.title}${l.author ? `, de ${l.author}` : ''}${quando}: ` + (m ? `nota média ${nota(m.media)} (${m.total} ${m.total === 1 ? 'avaliação' : 'avaliações'})` : 'sem avaliações'))
+    linhas.push(`- ${l.title}${l.author ? `, de ${l.author}` : ''}${quando}${l.is_extra ? ' (extra)' : ''}: ` + (m ? `nota média ${nota(m.media)} (${m.total} ${m.total === 1 ? 'avaliação' : 'avaliações'})` : 'sem avaliações'))
   }
   return linhas
 }
@@ -153,10 +154,13 @@ async function dadosAtuais() {
   const agora = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date())
   const linhas = [`Agora: ${dataHora(agora)} (horário de Brasília).`]
 
+  const CAMPOS_LIVRO = 'id, title, author, genre, pages, ebook_pages, series_name, series_volume, series_type, age_classification, spice_level, triggers, synopsis, reading_start_date, reading_end_date, meeting_date, goodreads_url'
+
   const { data: livro } = await supabase
     .from('books')
-    .select('id, title, author, genre, pages, ebook_pages, series_name, series_volume, series_type, age_classification, spice_level, triggers, synopsis, reading_start_date, reading_end_date, meeting_date, goodreads_url')
+    .select(CAMPOS_LIVRO)
     .eq('is_current', true)
+    .eq('is_extra', false)
     .or('is_draft.is.null,is_draft.eq.false')
     .limit(1)
     .maybeSingle()
@@ -175,6 +179,29 @@ async function dadosAtuais() {
     linhas.push(...await leituraDasMembras(livro.id))
   } else {
     linhas.push('', 'LEITURA DO MÊS: não cadastrada no momento.')
+  }
+
+  // Leitura extra: opcional, paralela à leitura do mês (ex.: continuação de
+  // livro antigo, pra quem quiser ler além da oficial).
+  const { data: extra } = await supabase
+    .from('books')
+    .select(CAMPOS_LIVRO)
+    .eq('is_current', true)
+    .eq('is_extra', true)
+    .or('is_draft.is.null,is_draft.eq.false')
+    .limit(1)
+    .maybeSingle()
+
+  if (extra) {
+    linhas.push('', 'LEITURA EXTRA (opcional, além da leitura do mês):')
+    linhas.push(`- ${extra.title}, de ${extra.author}` + (extra.genre ? ` (${extra.genre})` : ''))
+    if (extra.series_name) linhas.push(`- Série: ${extra.series_name}` + (extra.series_volume ? `, volume ${extra.series_volume}` : '') + (extra.series_type ? ` (${extra.series_type})` : ''))
+    if (extra.pages) linhas.push(`- Páginas: ${extra.pages}` + (extra.ebook_pages ? ` (e-book: ${extra.ebook_pages})` : ''))
+    if (extra.age_classification) linhas.push(`- Classificação indicativa: ${extra.age_classification}`)
+    if (extra.spice_level !== null && extra.spice_level !== undefined) linhas.push(`- Nível de picância (spice): ${extra.spice_level} de 5`)
+    if (extra.triggers) linhas.push(`- Gatilhos de conteúdo: ${extra.triggers}`)
+    if (extra.synopsis) linhas.push(`- Sinopse: ${extra.synopsis}`)
+    linhas.push(...await leituraDasMembras(extra.id))
   }
 
   const { data: encontros } = await supabase
