@@ -10,6 +10,10 @@ import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { PADRAO_SPOILER, guardarSpoiler, buscarUltimoSpoiler } from './spoiler.js'
+import { iniciarGuia, tentarAvancarGuia } from './guia.js'
+
+const AJUDA_COMANDOS =
+  '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
 
 const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💛 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
 
@@ -135,7 +139,14 @@ async function handleDM(sock, m, jid) {
       await sock.sendMessage(jid, { text: resultado.texto })
       return
     }
-    await sock.sendMessage(jid, { text: `Oii ${resultado.apelido}! Conta vinculada 💛 Agora é só pedir pra entrar nos grupos do Farol.` })
+    await iniciarGuia(sock, jid, resultado.apelido)
+    return
+  }
+
+  if (await tentarAvancarGuia(sock, jid, texto)) return
+
+  if (/^\/ajuda$/i.test(texto)) {
+    await sock.sendMessage(jid, { text: `Comandos do Faroleiro:\n\n${AJUDA_COMANDOS}` })
     return
   }
 

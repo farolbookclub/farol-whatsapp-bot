@@ -10,7 +10,7 @@ export async function vincularConta(jid, token) {
 
   const { data: cadastro, error: erroCadastro } = await supabase
     .from('signups')
-    .select('id, status, nome, apelido')
+    .select('id, status, nome, apelido, formato')
     .eq('confirmation_token', token)
     .maybeSingle()
   if (erroCadastro) console.error('vincularConta (buscar signup):', erroCadastro.message, erroCadastro.code)
@@ -31,10 +31,10 @@ export async function vincularConta(jid, token) {
 
   const { error } = await supabase
     .from('whatsapp_membros')
-    .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10) }, { onConflict: 'jid' })
+    .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1 }, { onConflict: 'jid' })
   if (error) throw error
 
-  return { ok: true, apelido: cadastro.apelido || cadastro.nome }
+  return { ok: true, apelido: cadastro.apelido || cadastro.nome, formato: cadastro.formato }
 }
 
 function normalizarNumero(numero) {
@@ -49,7 +49,7 @@ function normalizarNumero(numero) {
 export async function vincularPorNumero(sock, jid) {
   const { data: candidatos } = await supabase
     .from('signups')
-    .select('id, whatsapp, apelido, nome')
+    .select('id, whatsapp, apelido, nome, formato')
     .eq('status', 'aprovado')
     .not('whatsapp', 'is', null)
   if (!candidatos?.length) return null
@@ -81,7 +81,7 @@ export async function vincularPorNumero(sock, jid) {
 export async function inscricaoDoJid(jid) {
   const { data } = await supabase
     .from('whatsapp_membros')
-    .select('signups (status, apelido, nome)')
+    .select('signups (status, apelido, nome, formato)')
     .eq('jid', jid)
     .is('removido_em', null)
     .maybeSingle()

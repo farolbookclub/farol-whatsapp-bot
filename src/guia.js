@@ -1,0 +1,101 @@
+import { supabase } from './supabase.js'
+
+const SITE_URL = 'https://biofarol.vercel.app'
+const OK = '\nResponda Ok para prosseguir'
+
+const GUIA_SITE =
+  '✨ Site das membras: https://membrosfarol.vercel.app/\n' +
+  '🔑 O código está fixado em Avisos.\n' +
+  '📲 Toque no ícone de download (circulado de amarelo no print) para instalar o Farol no celular 💕\n\n' +
+  '📖 Leitura do mês: veja o livro atual e seus gatilhos de conteúdo.\n' +
+  '📚 Progresso: registre sua leitura, deixe comentários, dê notas e favorite/abandone livros.\n' +
+  '🗂️ Histórico: onde fica seu progresso e os comentários das meninas (⚠️ pode conter spoilers).\n' +
+  '💌 Clubinho: onde você pode enviar sugestões, feedbacks ou denúncias.\n' +
+  '🔎 E mais: regras, livros anteriores, encontrinhos, membras, ferramentas, arquivos e parceiros!'
+
+const GUIA_SPOILER =
+  '🤫 Spoiler\n\n' +
+  'Antes de comentar algo do livro, diga SPOILER + onde você está (capítulo ou porcentagem), e escreva o spoiler. Se for imagem, manda visualização única.'
+
+async function gruposParaEnviar(formato) {
+  const topicos = ['bate_papo', 'leitura', 'avisos']
+  if (formato === 'presencial') topicos.push('presencial')
+  const { data } = await supabase.from('whatsapp_grupos').select('group_jid, nome, topico').eq('ativo', true).in('topico', topicos)
+  return data ?? []
+}
+
+async function enviarLinks(sock, jid, formato) {
+  const grupos = await gruposParaEnviar(formato)
+  if (!grupos.length) {
+    await sock.sendMessage(jid, { text: 'Ainda não tenho os grupos configurados — chama a Administração 💛' })
+    return
+  }
+  let texto = 'Agora é só entrar nos grupos (toca em cada link e pede pra entrar):\n\n'
+  for (const g of grupos) {
+    try {
+      const codigo = await sock.groupInviteCode(g.group_jid)
+      texto += `• ${g.nome}: https://chat.whatsapp.com/${codigo}\n`
+    } catch (erro) {
+      console.error(`link do grupo ${g.nome}:`, erro)
+    }
+  }
+  texto += '\nQuando entrar, lembre de ativar as notificações do grupo 🔔'
+  texto += '\n\nDigita /ajuda a qualquer momento pra ver os comandos do Faroleiro 💬'
+  await sock.sendMessage(jid, { text: texto })
+}
+
+// Primeira etapa do guia (chamada logo depois de vincular a conta).
+export async function iniciarGuia(sock, jid, apelido) {
+  const texto = `Oii${apelido ? ' ' + apelido : ''}, tudo bem? Aqui é o Faroleiro, o robô do Farol 💛\n\nVou te mandar um guia do clube e, no final, o link pra entrar 💕${OK}`
+  await sock.sendMessage(jid, { text: texto })
+}
+
+// Se a pessoa estiver no meio do guia (guia_etapa setado) e responder "Ok",
+// avança pra próxima etapa. Devolve true se tratou a mensagem.
+export async function tentarAvancarGuia(sock, jid, texto) {
+  if (!/^ok[.!]?$/i.test(texto.trim())) return false
+
+  const { data: membro } = await supabase
+    .from('whatsapp_membros')
+    .select('guia_etapa, signup_id, signups (formato)')
+    .eq('jid', jid)
+    .maybeSingle()
+  const etapa = membro?.guia_etapa
+  if (!etapa) return false
+
+  const formato = membro.signups?.formato
+
+  if (etapa === 1) {
+    const presencial = formato === 'presencial'
+    const texto2 =
+      'Nossa comunidade é um grupo com estes tópicos:\n\n' +
+      '📢 Avisos\n' +
+      '💬 Bate-papo (falamos de tudo um pouco)\n' +
+      '📚 Leitura do mês (falamos sobre a nossa leitura atual)' +
+      (presencial ? '\n\n☕ Como você é do Presencial, também tem o grupo do Presencial.' : '') +
+      OK
+    await sock.sendMessage(jid, { text: texto2 })
+    await supabase.from('whatsapp_membros').update({ guia_etapa: 2 }).eq('jid', jid)
+    return true
+  }
+
+  if (etapa === 2) {
+    await sock.sendMessage(jid, { text: `${GUIA_SITE}${OK}` })
+    await supabase.from('whatsapp_membros').update({ guia_etapa: 3 }).eq('jid', jid)
+    return true
+  }
+
+  if (etapa === 3) {
+    await sock.sendMessage(jid, { text: `${GUIA_SPOILER}${OK}` })
+    await supabase.from('whatsapp_membros').update({ guia_etapa: 4 }).eq('jid', jid)
+    return true
+  }
+
+  if (etapa === 4) {
+    await enviarLinks(sock, jid, formato)
+    await supabase.from('whatsapp_membros').update({ guia_etapa: null }).eq('jid', jid)
+    return true
+  }
+
+  return false
+}
