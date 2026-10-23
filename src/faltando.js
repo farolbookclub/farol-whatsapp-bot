@@ -38,3 +38,40 @@ export async function membrosFaltando(sock, groupJid) {
 
   return { nomeGrupo: meta.subject, semVinculo, naoNoGrupo }
 }
+
+// Processa checagens pedidas pelo painel admin (fica privado, não posta nada
+// no grupo). Uma por vez, a mais antiga pendente primeiro.
+export async function processarChecagensPendentes(sock) {
+  const { data: checagem } = await supabase
+    .from('whatsapp_checagens')
+    .select('id, topico')
+    .eq('status', 'pendente')
+    .order('criado_em', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (!checagem) return
+
+  await supabase.from('whatsapp_checagens').update({ status: 'processando' }).eq('id', checagem.id)
+
+  try {
+    const { data: grupo } = await supabase
+      .from('whatsapp_grupos')
+      .select('group_jid')
+      .eq('topico', checagem.topico)
+      .eq('ativo', true)
+      .maybeSingle()
+    if (!grupo) throw new Error('Esse tópico ainda não tem grupo configurado (!configurar).')
+
+    const resultado = await membrosFaltando(sock, grupo.group_jid)
+    await supabase
+      .from('whatsapp_checagens')
+      .update({ status: 'concluido', resultado, concluido_em: new Date().toISOString() })
+      .eq('id', checagem.id)
+  } catch (erro) {
+    console.error('processarChecagensPendentes:', erro)
+    await supabase
+      .from('whatsapp_checagens')
+      .update({ status: 'erro', erro: erro?.message || 'falha desconhecida', concluido_em: new Date().toISOString() })
+      .eq('id', checagem.id)
+  }
+}

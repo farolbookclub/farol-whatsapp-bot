@@ -12,7 +12,7 @@ import { processarAvisosPendentes } from './avisos.js'
 import { PADRAO_SPOILER, guardarSpoiler, buscarUltimoSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia } from './guia.js'
 import { perguntarIA } from './ia.js'
-import { membrosFaltando } from './faltando.js'
+import { membrosFaltando, processarChecagensPendentes } from './faltando.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -368,5 +368,10 @@ setInterval(() => {
 setInterval(() => {
   if (sockAtual) processarAvisosPendentes(sockAtual).catch((e) => console.error('processar avisos:', e))
 }, 30 * 1000)
+
+// Checagens de "quem falta" pedidas pelo painel admin: checa a cada 15s.
+setInterval(() => {
+  if (sockAtual) processarChecagensPendentes(sockAtual).catch((e) => console.error('processar checagens:', e))
+}, 15 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)
