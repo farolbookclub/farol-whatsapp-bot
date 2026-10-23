@@ -12,6 +12,7 @@ import { processarAvisosPendentes } from './avisos.js'
 import { PADRAO_SPOILER, guardarSpoiler, buscarUltimoSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia } from './guia.js'
 import { perguntarIA } from './ia.js'
+import { membrosFaltando } from './faltando.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -131,6 +132,18 @@ async function handleGroupMessage(sock, m, groupJid) {
     if (!admin) return
     const resposta = await configurarGrupo(groupJid, meta.subject, comandoConfigurar[1].toLowerCase())
     await sock.sendMessage(groupJid, { text: resposta })
+    return
+  }
+
+  if (/^!faltando$/i.test(texto)) {
+    const meta = await sock.groupMetadata(groupJid)
+    const admin = meta.participants.find((p) => p.id === participant)?.admin
+    if (!admin) return
+    const { nomeGrupo, semVinculo, naoNoGrupo } = await membrosFaltando(sock, groupJid)
+    let texto2 = `Checagem do grupo "${nomeGrupo}":\n\n`
+    texto2 += naoNoGrupo.length ? `Aprovadas e vinculadas, mas não estão aqui (${naoNoGrupo.length}):\n${naoNoGrupo.join(', ')}` : 'Todas as vinculadas já estão aqui 💛'
+    if (semVinculo.length) texto2 += `\n\nAprovadas mas ainda sem WhatsApp vinculado (${semVinculo.length}):\n${semVinculo.join(', ')}`
+    await sock.sendMessage(groupJid, { text: texto2 })
     return
   }
 
