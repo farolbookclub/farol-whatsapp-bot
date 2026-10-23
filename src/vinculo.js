@@ -93,6 +93,22 @@ export async function registrarInteracao(jid) {
   if (error) console.error('registrarInteracao:', error.message)
 }
 
+// Saiu/foi removida de todos os grupos (ou do Avisos, o "grupo principal"):
+// cancela a inscrição (libera a vaga) e desfaz o vínculo. Espelha o que o
+// Telegram já fazia (saidaDoGrupo) — lá só existe 1 grupo, aqui são vários.
+export async function desvincularECancelar(jid, signupId, motivo) {
+  await supabase
+    .from('whatsapp_membros')
+    .update({ removido_em: new Date().toISOString().slice(0, 10), signup_id: null, lembrete_ref: null })
+    .eq('jid', jid)
+  if (!signupId) return
+  await supabase
+    .from('signups')
+    .update({ status: 'cancelado', cancelado_motivo: motivo, cancelado_em: new Date().toISOString() })
+    .eq('id', signupId)
+    .neq('status', 'cancelado')
+}
+
 // A inscrição aprovada ligada a esse jid (ou null).
 export async function inscricaoDoJid(jid) {
   const { data } = await supabase

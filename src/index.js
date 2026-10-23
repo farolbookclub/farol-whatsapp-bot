@@ -4,7 +4,7 @@ import qrcodeTerminal from 'qrcode-terminal'
 import { grupoAtivo, identificarTopico, configurarGrupo, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
-import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao } from './vinculo.js'
+import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
@@ -99,6 +99,26 @@ function meusIdentificadores(sock) {
   if (me.id) ids.add(String(me.id).split(':')[0].split('@')[0])
   if (me.lid) ids.add(String(me.lid).split(':')[0].split('@')[0])
   return ids
+}
+
+// Confere nos grupos ativos de verdade (Baileys) se essa pessoa ainda está em
+// algum deles, pra saber se "saiu de um grupo" quer dizer "saiu do clube".
+async function estaEmAlgumGrupoAtivo(sock, jid) {
+  const numero = String(jid).split('@')[0]
+  const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid').eq('ativo', true)
+  for (const g of grupos ?? []) {
+    try {
+      const meta = await sock.groupMetadata(g.group_jid)
+      for (const p of meta.participants) {
+        for (const campo of [p.id, p.jid, p.lid]) {
+          if (campo && String(campo).split(':')[0].split('@')[0] === numero) return true
+        }
+      }
+    } catch (erro) {
+      console.error(`estaEmAlgumGrupoAtivo (${g.group_jid}):`, erro)
+    }
+  }
+  return false
 }
 
 // Mesma regra do Telegram: responde a pergunta pra IA só quando mencionam o
@@ -361,10 +381,29 @@ async function connectToWhatsApp() {
           try {
             const inscricao = await inscricaoDoJid(participantJid)
             if (!inscricao) continue
-            await avisarAdminEntrouSaiu('saiu', {
-              apelido: inscricao.apelido || inscricao.nome,
-              motivo: update.action === 'leave' ? 'saida_voluntaria' : 'removida_adm_whatsapp',
-            })
+            const motivo = update.action === 'leave' ? 'saida_voluntaria' : 'removida_adm_whatsapp'
+            await avisarAdminEntrouSaiu('saiu', { apelido: inscricao.apelido || inscricao.nome, motivo })
+
+            // Saiu/foi tirada do grupo principal (Avisos) ou já não está em
+            // grupo nenhum: cancela a inscrição de fato (libera a vaga).
+            // Saiu só de um grupo específico (ex: só do Presencial): não
+            // mexe na inscrição, só avisa.
+            const saiuDoPrincipal = topico === 'avisos'
+            const aindaEmAlgumGrupo = saiuDoPrincipal ? false : await estaEmAlgumGrupoAtivo(sock, participantJid)
+            if (saiuDoPrincipal || !aindaEmAlgumGrupo) {
+              const { data: membro } = await supabase
+                .from('whatsapp_membros').select('signup_id').eq('jid', participantJid).is('removido_em', null).maybeSingle()
+              await desvincularECancelar(participantJid, membro?.signup_id || null, motivo)
+              if (update.action === 'leave') {
+                try {
+                  await sock.sendMessage(participantJid, {
+                    text: 'Vi que você saiu do grupo do Farol 💔 Se quiser voltar, é só chamar a Administração ou fazer uma nova adesão pelo site.',
+                  })
+                } catch (erro) {
+                  console.error('aviso de saída (DM):', erro)
+                }
+              }
+            }
           } catch (erro) {
             console.error('aviso de saída:', erro)
           }
