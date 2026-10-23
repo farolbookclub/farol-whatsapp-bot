@@ -15,3 +15,5 @@ export const GROQ_API_KEY = exigir('GROQ_API_KEY')
 export const WHATSAPP_PHONE_NUMBER = process.env.WHATSAPP_PHONE_NUMBER || null
 // Segredo do biofarol (WHATSAPP_CODIGO_SECRET) — só precisa pro !novocodigo funcionar.
 export const CODIGO_SECRET = process.env.CODIGO_SECRET || null
+// Segredo do biofarol (WHATSAPP_PUSH_SECRET) — só precisa pro push de "entrou/saiu" pra Kah.
+export const PUSH_SECRET = process.env.PUSH_SECRET || null

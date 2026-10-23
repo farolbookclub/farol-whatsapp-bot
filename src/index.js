@@ -17,6 +17,7 @@ import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
 import { processarInatividadeDiaria } from './inatividade.js'
+import { avisarAdminEntrouSaiu } from './pushAdmin.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -333,24 +334,44 @@ async function connectToWhatsApp() {
   // Quem é adicionada na mão por uma admin (sem pedido de entrada) não passa
   // pelo link/token — tenta reconhecer pelo número de WhatsApp da inscrição.
   sock.ev.on('group-participants.update', async (update) => {
-    if (update.action !== 'add') return
     try {
       const topico = await identificarTopico(update.id)
       if (!topico) return
-      for (const participantJid of update.participants) {
-        if (await inscricaoDoJid(participantJid)) continue
-        const encontrada = await vincularPorNumero(sock, participantJid)
-        if (encontrada) {
-          const nome = encontrada.apelido || encontrada.nome
+
+      if (update.action === 'add') {
+        for (const participantJid of update.participants) {
+          const jaInscrita = await inscricaoDoJid(participantJid)
+          if (jaInscrita) {
+            await avisarAdminEntrouSaiu('entrou', { apelido: jaInscrita.apelido || jaInscrita.nome, formato: jaInscrita.formato })
+            continue
+          }
+          const encontrada = await vincularPorNumero(sock, participantJid)
+          if (encontrada) {
+            const nome = encontrada.apelido || encontrada.nome
+            try {
+              await sock.sendMessage(participantJid, { text: `Oii ${nome}! Reconheci seu número e já vinculei sua conta ao Farol 💛` })
+            } catch (erro) {
+              console.error('aviso de vínculo automático:', erro)
+            }
+            await avisarAdminEntrouSaiu('entrou', { apelido: nome, formato: encontrada.formato })
+          }
+        }
+      } else if (update.action === 'remove' || update.action === 'leave') {
+        for (const participantJid of update.participants) {
           try {
-            await sock.sendMessage(participantJid, { text: `Oii ${nome}! Reconheci seu número e já vinculei sua conta ao Farol 💛` })
+            const inscricao = await inscricaoDoJid(participantJid)
+            if (!inscricao) continue
+            await avisarAdminEntrouSaiu('saiu', {
+              apelido: inscricao.apelido || inscricao.nome,
+              motivo: update.action === 'leave' ? 'saida_voluntaria' : 'removida_adm_whatsapp',
+            })
           } catch (erro) {
-            console.error('aviso de vínculo automático:', erro)
+            console.error('aviso de saída:', erro)
           }
         }
       }
     } catch (erro) {
-      console.error('vincular por número:', erro)
+      console.error('group-participants.update:', erro)
     }
   })
 
