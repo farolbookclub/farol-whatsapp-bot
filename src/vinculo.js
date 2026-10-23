@@ -38,9 +38,13 @@ export async function vincularConta(jid, token) {
 }
 
 export function normalizarNumero(numero) {
-  let digitos = String(numero || '').replace(/\D/g, '')
+  const bruto = String(numero || '').trim()
+  if (!bruto) return null
+  const digitos = bruto.replace(/\D/g, '')
   if (!digitos) return null
-  if (digitos.length <= 11) digitos = '55' + digitos // sem DDI: assume Brasil
+  // Com "+": já tem DDI explícito, usa como está (não assume Brasil).
+  if (bruto.startsWith('+')) return digitos
+  if (digitos.length <= 11) return '55' + digitos // sem DDI: assume Brasil
   return digitos
 }
 
