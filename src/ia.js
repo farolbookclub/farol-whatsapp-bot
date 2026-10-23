@@ -240,6 +240,21 @@ async function dadosAtuais() {
     }
   }
 
+  const { data: avisos } = await supabase
+    .from('whatsapp_mensagens')
+    .select('apelido, texto, criado_em')
+    .eq('topico', 'avisos')
+    .order('criado_em', { ascending: false })
+    .limit(20)
+
+  if (avisos?.length) {
+    linhas.push('', 'AVISOS RECENTES (postados no grupo Avisos pela Administração, mais novos primeiro; use pra responder sobre novidades/comunicados):')
+    for (const a of avisos) {
+      const texto = String(a.texto || '').replace(/\s+/g, ' ').trim()
+      linhas.push(`- [${dataCurta(a.criado_em)}] ${a.apelido || 'alguém'}: ${texto.length > 400 ? texto.slice(0, 400) + '…' : texto}`)
+    }
+  }
+
   linhas.push(...await leiturasAnteriores())
 
   dadosCache = linhas.join('\n')
