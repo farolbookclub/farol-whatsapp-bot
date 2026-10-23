@@ -7,8 +7,14 @@ import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
+import { checarProgressoLeitura } from './avisoLeitura.js'
+import { processarAvisosPendentes } from './avisos.js'
+import { PADRAO_SPOILER, guardarSpoiler, buscarUltimoSpoiler } from './spoiler.js'
 
 const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💛 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
+
+// Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
+let sockAtual = null
 
 function textoDaMensagem(m) {
   const msg = m.message
@@ -93,6 +99,21 @@ async function handleGroupMessage(sock, m, groupJid) {
   if (!(await grupoAtivo(groupJid))) return
   const topico = await identificarTopico(groupJid)
   if (!topico) return
+
+  // "SPOILER ..." no tópico de leitura: some do grupo, guarda só pra quem
+  // pedir no privado (não tem como "borrar" mensagem no WhatsApp).
+  if (topico === 'leitura' && PADRAO_SPOILER.test(texto)) {
+    const apelido = m.pushName || 'alguém'
+    try {
+      await sock.sendMessage(groupJid, { delete: m.key })
+    } catch (erro) {
+      console.error('apagar spoiler:', erro)
+    }
+    await guardarSpoiler({ groupJid, topico, apelido, texto })
+    await sock.sendMessage(groupJid, { text: `🤫 ${apelido} comentou algo com spoiler (removido daqui). Quer ver? Manda /spoiler no meu privado 💬` })
+    return
+  }
+
   await guardarMensagem({
     groupJid,
     topico,
@@ -115,6 +136,19 @@ async function handleDM(sock, m, jid) {
       return
     }
     await sock.sendMessage(jid, { text: `Oii ${resultado.apelido}! Conta vinculada 💛 Agora é só pedir pra entrar nos grupos do Farol.` })
+    return
+  }
+
+  if (/^\/spoiler$/i.test(texto)) {
+    const inscricao = await inscricaoDoJid(jid)
+    if (!inscricao) {
+      await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💛' })
+      return
+    }
+    const ultimo = await buscarUltimoSpoiler('leitura')
+    await sock.sendMessage(jid, {
+      text: ultimo ? `🤫 Spoiler de ${ultimo.apelido}:\n\n${ultimo.texto}` : 'Não tem nenhum spoiler guardado ainda.',
+    })
     return
   }
 
@@ -177,6 +211,7 @@ async function connectToWhatsApp() {
       if (!deslogado) connectToWhatsApp()
     } else if (connection === 'open') {
       console.log('Conectado ao WhatsApp! 💛')
+      sockAtual = sock
       try {
         await processarPendentes(sock)
       } catch (erro) {
@@ -241,5 +276,16 @@ connectToWhatsApp()
 
 // Limpeza de retenção, uma vez por dia.
 setInterval(() => limparMensagensAntigas().catch((e) => console.error('limpar mensagens:', e)), 24 * 60 * 60 * 1000)
+
+// Progresso de leitura do site: checa a cada 1 minuto.
+setInterval(() => {
+  if (sockAtual) checarProgressoLeitura(sockAtual).catch((e) => console.error('checar progresso leitura:', e))
+}, 60 * 1000)
+
+// Avisos pendentes do painel admin ("avisar todas"): checa a cada 30s. O
+// próprio processarAvisosPendentes já espera 5s entre cada mensagem.
+setInterval(() => {
+  if (sockAtual) processarAvisosPendentes(sockAtual).catch((e) => console.error('processar avisos:', e))
+}, 30 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)
