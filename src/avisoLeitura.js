@@ -53,29 +53,43 @@ async function textoProgresso(p, livro) {
   return { texto, mention: quem.mention }
 }
 
-// Checa progresso_leitura novo desde a última vez e posta no grupo Leitura do
-// mês, sem revelar comentário (link pro site em vez de citar o texto).
+// Notas (public_ratings) não têm comentário livre, só nota e favorito — sem
+// risco de spoiler, por isso vai tudo direto na mensagem.
+async function textoNota(r, livro) {
+  const quem = await resolverMencao(r.nome_publico)
+  const nota = String(Number(r.rating)).replace('.', ',')
+  let texto = `⭐ ${quem.texto}\navaliou "${livro}": nota ${nota}`
+  if (r.is_favorite) texto += ' — favorito ❤️'
+  return { texto, mention: quem.mention }
+}
+
+// Checa progresso_leitura e public_ratings (avaliações) novos desde a última
+// vez e posta no grupo Leitura do mês. Progresso não revela comentário (link
+// pro site em vez de citar o texto); nota não tem comentário, então vai tudo.
 export async function checarProgressoLeitura(sock) {
   const { data: estado } = await supabase.from('whatsapp_leitura_checagem').select('ultima_em').eq('id', 1).maybeSingle()
   const desde = estado?.ultima_em || new Date(0).toISOString()
   const agora = new Date().toISOString()
 
   const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid').eq('topico', 'leitura').eq('ativo', true)
-  const { data: novos, error } = await supabase
+  const { data: novosProgresso, error: erroProgresso } = await supabase
     .from('progresso_leitura')
+    .select('*')
+    .gt('created_at', desde)
+    .order('created_at', { ascending: true })
+  const { data: novasNotas, error: erroNotas } = await supabase
+    .from('public_ratings')
     .select('*')
     .gt('created_at', desde)
     .order('created_at', { ascending: true })
 
   await supabase.from('whatsapp_leitura_checagem').upsert({ id: 1, ultima_em: agora })
 
-  if (error) {
-    console.error('checarProgressoLeitura:', error.message)
-    return
-  }
-  if (!grupos?.length || !novos?.length) return
+  if (erroProgresso) console.error('checarProgressoLeitura (progresso):', erroProgresso.message)
+  if (erroNotas) console.error('checarProgressoLeitura (notas):', erroNotas.message)
+  if (!grupos?.length) return
 
-  for (const registro of novos) {
+  for (const registro of novosProgresso ?? []) {
     try {
       const { data: livro } = await supabase.from('books').select('title').eq('id', registro.book_id).maybeSingle()
       const { texto, mention } = await textoProgresso(registro, livro?.title || 'o livro')
@@ -84,6 +98,18 @@ export async function checarProgressoLeitura(sock) {
       }
     } catch (erro) {
       console.error('postar progresso:', erro)
+    }
+  }
+
+  for (const registro of novasNotas ?? []) {
+    try {
+      const { data: livro } = await supabase.from('books').select('title').eq('id', registro.book_id).maybeSingle()
+      const { texto, mention } = await textoNota(registro, livro?.title || 'o livro')
+      for (const g of grupos) {
+        await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
+      }
+    } catch (erro) {
+      console.error('postar nota:', erro)
     }
   }
 }
