@@ -193,13 +193,17 @@ async function connectToWhatsApp() {
     }
   })
 
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const m of messages) {
       if (!m.message || m.key.fromMe) continue
       const jid = m.key.remoteJid
+      console.log(`[msg] tipo=${type} de=${jid} texto="${textoDaMensagem(m).slice(0, 60)}"`)
       try {
+        // Grupo sempre termina em @g.us. Privado pode vir como @s.whatsapp.net
+        // (formato clássico) ou @lid (formato novo do WhatsApp pra alguns
+        // números) — trata qualquer coisa que não seja grupo como privado.
         if (jid.endsWith('@g.us')) await handleGroupMessage(sock, m, jid)
-        else if (jid.endsWith('@s.whatsapp.net')) await handleDM(sock, m, jid)
+        else if (!jid.endsWith('@broadcast')) await handleDM(sock, m, jid)
       } catch (erro) {
         console.error('processar mensagem:', erro)
       }
