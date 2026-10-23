@@ -79,8 +79,14 @@ async function comandoResumo(sock, jid, topicoForcado) {
   await gerarEEnviarResumo(sock, jid, topicoForcado || 'bate_papo')
 }
 
-function meuNumero(sock) {
-  return String(sock.user?.id || '').split(':')[0].split('@')[0]
+// O WhatsApp às vezes menciona/identifica o próprio bot pelo número normal,
+// às vezes pelo @lid (identificador novo) — junta os dois pra comparar.
+function meusIdentificadores(sock) {
+  const ids = new Set()
+  const me = sock.user || {}
+  if (me.id) ids.add(String(me.id).split(':')[0].split('@')[0])
+  if (me.lid) ids.add(String(me.lid).split(':')[0].split('@')[0])
+  return ids
 }
 
 // Mesma regra do Telegram: responde a pergunta pra IA só quando mencionam o
@@ -88,14 +94,14 @@ function meuNumero(sock) {
 async function responderSeMencionado(sock, m, jid) {
   const texto = textoDaMensagem(m)
   const contextInfo = m.message?.extendedTextMessage?.contextInfo
-  const meu = meuNumero(sock)
-  const mencionou = (contextInfo?.mentionedJid || []).some((j) => j.split('@')[0] === meu)
+  const meus = meusIdentificadores(sock)
+  const mencionou = (contextInfo?.mentionedJid || []).some((j) => meus.has(j.split('@')[0]))
 
   const participanteOriginal = contextInfo?.participant
   const quotedMsg = contextInfo?.quotedMessage
   const textoQuotado = quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || ''
   const avisoAutomatico = /^(Pronto, você entrou|Oii .+! (Conta vinculada|Reconheci)|🤫|📖|✨ Resumo|Agora é só entrar|Nossa comunidade|Responda Ok)/.test(textoQuotado)
-  const respondeuBot = participanteOriginal && participanteOriginal.split('@')[0] === meu && !avisoAutomatico
+  const respondeuBot = participanteOriginal && meus.has(participanteOriginal.split('@')[0]) && !avisoAutomatico
 
   if (!mencionou && !respondeuBot) return
 
@@ -272,6 +278,7 @@ async function connectToWhatsApp() {
       if (!deslogado) connectToWhatsApp()
     } else if (connection === 'open') {
       console.log('Conectado ao WhatsApp! 💛')
+      console.log('[eu]', JSON.stringify(sock.user))
       sockAtual = sock
       try {
         await processarPendentes(sock)
