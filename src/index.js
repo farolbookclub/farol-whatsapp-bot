@@ -32,10 +32,14 @@ function textoDaMensagem(m) {
 }
 
 // Aprova ou recusa um pedido de entrada, conferindo a inscrição vinculada ao
-// número. Mesma regra do Telegram: só quem está aprovada e vinculada entra.
+// número. Mesma regra do Telegram: só quem está aprovada e vinculada entra,
+// e o grupo Presencial é só pra quem é do formato presencial.
 async function processarPedidoEntrada(sock, groupJid, participantJid) {
   const inscricao = await inscricaoDoJid(participantJid)
-  if (inscricao) {
+  const topico = await identificarTopico(groupJid)
+  const pode = inscricao && (topico !== 'presencial' || inscricao.formato === 'presencial')
+
+  if (pode) {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'approve')
     try {
       const meta = await sock.groupMetadata(groupJid)
@@ -46,7 +50,9 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
   } else {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'reject')
     try {
-      await sock.sendMessage(participantJid, { text: AJUDA })
+      await sock.sendMessage(participantJid, {
+        text: inscricao ? 'Esse grupo é só para quem participa do Farol Presencial.' : AJUDA,
+      })
     } catch (erro) {
       console.error('aviso de recusa:', erro)
     }
