@@ -4,7 +4,7 @@ import qrcodeTerminal from 'qrcode-terminal'
 import { grupoAtivo, identificarTopico, configurarGrupo, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
-import { vincularConta, inscricaoDoJid, vincularPorNumero } from './vinculo.js'
+import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
@@ -169,6 +169,8 @@ async function handleGroupMessage(sock, m, groupJid) {
   if (!(await grupoAtivo(groupJid))) return
   const topico = await identificarTopico(groupJid)
   if (!topico) return
+
+  await registrarInteracao(participant)
 
   // "SPOILER ..." no tópico de leitura: some do grupo, guarda só pra quem
   // pedir no privado (não tem como "borrar" mensagem no WhatsApp).
@@ -342,6 +344,22 @@ async function connectToWhatsApp() {
       }
     } catch (erro) {
       console.error('vincular por número:', erro)
+    }
+  })
+
+  // Reação também conta como interação (regra: "qualquer mensagem ou reação conta").
+  sock.ev.on('messages.reaction', async (reacoes) => {
+    for (const r of reacoes) {
+      try {
+        const groupJid = r.key?.remoteJid
+        const reactorJid = r.reaction?.key?.participant || r.reaction?.key?.remoteJid
+        if (!groupJid?.endsWith('@g.us') || !reactorJid) continue
+        if (!(await grupoAtivo(groupJid))) continue
+        if (!(await identificarTopico(groupJid))) continue
+        await registrarInteracao(reactorJid)
+      } catch (erro) {
+        console.error('reação:', erro)
+      }
     }
   })
 

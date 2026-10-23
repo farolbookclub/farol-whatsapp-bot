@@ -77,6 +77,18 @@ export async function vincularPorNumero(sock, jid) {
   return null
 }
 
+// Marca que essa pessoa falou hoje (qualquer mensagem em qualquer grupo
+// acompanhado conta), pra regra de inatividade. Não faz nada se não estiver
+// vinculada.
+export async function registrarInteracao(jid) {
+  const { error } = await supabase
+    .from('whatsapp_membros')
+    .update({ ultima_interacao: new Date().toISOString().slice(0, 10) })
+    .eq('jid', jid)
+    .is('removido_em', null)
+  if (error) console.error('registrarInteracao:', error.message)
+}
+
 // A inscrição aprovada ligada a esse jid (ou null).
 export async function inscricaoDoJid(jid) {
   const { data } = await supabase
