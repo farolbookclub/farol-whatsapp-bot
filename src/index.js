@@ -17,7 +17,7 @@ import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
 import { processarInatividadeDiaria } from './inatividade.js'
-import { avisarAdminEntrouSaiu } from './pushAdmin.js'
+import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -348,6 +348,7 @@ async function connectToWhatsApp() {
       await processarPedidoEntrada(sock, req.id, req.participant)
     } catch (erro) {
       console.error('pedido de entrada:', erro)
+      await avisarAdminErro(`pedido de entrada: ${erro?.message || erro}`)
     }
   })
 
@@ -411,6 +412,7 @@ async function connectToWhatsApp() {
       }
     } catch (erro) {
       console.error('group-participants.update:', erro)
+      await avisarAdminErro(`group-participants.update: ${erro?.message || erro}`)
     }
   })
 
@@ -443,12 +445,24 @@ async function connectToWhatsApp() {
         else if (!jid.endsWith('@broadcast')) await handleDM(sock, m, jid)
       } catch (erro) {
         console.error('processar mensagem:', erro)
+        await avisarAdminErro(`processar mensagem: ${erro?.message || erro}`)
       }
     }
   })
 
   return sock
 }
+
+// Erro que ninguém pegou (travaria o processo): avisa a Kah antes de deixar
+// o Node derrubar o bot, pra ela saber que precisa reiniciar.
+process.on('uncaughtException', (erro) => {
+  console.error('uncaughtException:', erro)
+  avisarAdminErro(`o Faroleiro travou: ${erro?.message || erro}`).finally(() => process.exit(1))
+})
+process.on('unhandledRejection', (erro) => {
+  console.error('unhandledRejection:', erro)
+  avisarAdminErro(`erro não tratado: ${erro?.message || erro}`)
+})
 
 connectToWhatsApp()
 
