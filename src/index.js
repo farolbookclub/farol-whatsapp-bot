@@ -16,6 +16,7 @@ import { membrosFaltando, processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
+import { processarInatividadeDiaria } from './inatividade.js'
 
 const AJUDA_COMANDOS =
   '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
@@ -424,5 +425,11 @@ setInterval(() => {
 setInterval(() => {
   if (sockAtual) checarCodigoPendente(sockAtual).catch((e) => console.error('checar código:', e))
 }, 30 * 1000)
+
+// Inatividade (lembrete/remoção) e parabéns (aniversário e tempo de clube):
+// a função só age 1x por dia (controlada por bot_config), checa a cada 10 min.
+setInterval(() => {
+  if (sockAtual) processarInatividadeDiaria(sockAtual).catch((e) => console.error('processar inatividade:', e))
+}, 10 * 60 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)
