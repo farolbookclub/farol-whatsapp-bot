@@ -469,41 +469,43 @@ connectToWhatsApp()
 // Limpeza de retenção, uma vez por dia.
 setInterval(() => limparMensagensAntigas().catch((e) => console.error('limpar mensagens:', e)), 24 * 60 * 60 * 1000)
 
-// Progresso de leitura do site: checa a cada 1 minuto.
+// Progresso de leitura do site: checa a cada 2 minutos.
+// (Frequências abaixo reduzidas pra economizar Disk IO do Supabase — não
+// precisa ser em tempo real, ninguém reclama de meio minuto a mais.)
 setInterval(() => {
   if (sockAtual) checarProgressoLeitura(sockAtual).catch((e) => console.error('checar progresso leitura:', e))
-}, 60 * 1000)
+}, 2 * 60 * 1000)
 
-// Avisos pendentes do painel admin ("avisar todas"): checa a cada 30s. O
+// Avisos pendentes do painel admin ("avisar todas"): checa a cada 1 min. O
 // próprio processarAvisosPendentes já espera 5s entre cada mensagem.
 setInterval(() => {
   if (sockAtual) processarAvisosPendentes(sockAtual).catch((e) => console.error('processar avisos:', e))
-}, 30 * 1000)
+}, 60 * 1000)
 
-// Checagens de "quem falta" pedidas pelo painel admin: checa a cada 15s.
+// Checagens de "quem falta" pedidas pelo painel admin: checa a cada 1 min.
 setInterval(() => {
   if (sockAtual) processarChecagensPendentes(sockAtual).catch((e) => console.error('processar checagens:', e))
-}, 15 * 1000)
+}, 60 * 1000)
 
-// Remoções pedidas pelo cancelamento de inscrição no painel admin: checa a cada 15s.
+// Remoções pedidas pelo cancelamento de inscrição no painel admin: checa a cada 1 min.
 setInterval(() => {
   if (sockAtual) processarRemocoesPendentes(sockAtual).catch((e) => console.error('processar remoções:', e))
-}, 15 * 1000)
+}, 60 * 1000)
 
-// Vínculo automático por número, pedido pelo painel admin: checa a cada 15s.
+// Vínculo automático por número, pedido pelo painel admin: checa a cada 1 min.
 setInterval(() => {
   if (sockAtual) processarAutolinkPendentes(sockAtual).catch((e) => console.error('processar autolink:', e))
-}, 15 * 1000)
+}, 60 * 1000)
 
-// Código do site trocado (rotação automática ou !novocodigo): checa a cada 30s.
+// Código do site trocado (rotação automática ou !novocodigo): checa a cada 1 min.
 setInterval(() => {
   if (sockAtual) checarCodigoPendente(sockAtual).catch((e) => console.error('checar código:', e))
-}, 30 * 1000)
+}, 60 * 1000)
 
 // Inatividade (lembrete/remoção) e parabéns (aniversário e tempo de clube):
-// a função só age 1x por dia (controlada por bot_config), checa a cada 10 min.
+// a função só age 1x por dia (controlada por bot_config), checa a cada 30 min.
 setInterval(() => {
   if (sockAtual) processarInatividadeDiaria(sockAtual).catch((e) => console.error('processar inatividade:', e))
-}, 10 * 60 * 1000)
+}, 30 * 60 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)
