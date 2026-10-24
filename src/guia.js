@@ -115,7 +115,7 @@ async function avisarJaNosGruposEConferirFaltantes(sock, jid, formato) {
 // Administração (não precisa do link no final, só do guia mesmo).
 export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
   const fim = jaNosGrupos ? 'Vou te mandar um guia do clube 💕' : 'Vou te mandar um guia do clube antes de você entrar 💕'
-  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''} , tudo bem? Aqui é o *Faroleiro* , o *robô* do *Farol* 💛\n${fim}${OK}`
+  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}, tudo bem? Aqui é o *Faroleiro*, o *robô* do *Farol* 💛\n${fim}${OK}`
   await sock.sendMessage(jid, { text: texto })
 }
 
