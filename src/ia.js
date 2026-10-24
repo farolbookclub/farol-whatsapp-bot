@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 import { GROQ_API_KEY } from './config.js'
 import { CONHECIMENTO } from './conhecimento.js'
+import { pegarHistorico, guardarTroca } from './historico.js'
 
 function hojeSP() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
@@ -308,6 +309,7 @@ export async function perguntarIA(jid, pergunta) {
       ...(String(config.ia_modelo).startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}),
       messages: [
         { role: 'system', content: promptIA(await dadosAtuais()) },
+        ...pegarHistorico(jid),
         { role: 'user', content: pergunta },
       ],
     }),
@@ -318,5 +320,6 @@ export async function perguntarIA(jid, pergunta) {
     console.error('Groq:', r.status, JSON.stringify(json?.error ?? json))
     return 'Tive um probleminha pra responder agora 😕 Tenta de novo daqui a pouco ou chama a Administração.'
   }
+  guardarTroca(jid, pergunta, resposta)
   return resposta
 }

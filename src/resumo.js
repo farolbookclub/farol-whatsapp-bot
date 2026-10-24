@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 import { GROQ_API_KEY } from './config.js'
 import { dadosAtuais } from './ia.js'
+import { pegarHistorico, guardarTroca } from './historico.js'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const RETENCAO_DIAS = { bate_papo: 10, leitura: 30, avisos: 30, presencial: 30 }
@@ -11,7 +12,7 @@ async function modeloIA() {
   return data?.ia_modelo || 'openai/gpt-oss-20b'
 }
 
-async function chamarGroq(promptSistema, conteudo, maxTokens) {
+async function chamarGroq(promptSistema, conteudo, maxTokens, historico = []) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
@@ -21,6 +22,7 @@ async function chamarGroq(promptSistema, conteudo, maxTokens) {
       max_tokens: maxTokens,
       messages: [
         { role: 'system', content: promptSistema },
+        ...historico,
         { role: 'user', content: conteudo },
       ],
     }),
@@ -114,6 +116,7 @@ export async function responderFollowUpResumo(sock, jid, topico, mensagens, perg
     'Se for algo sobre o que foi conversado no grupo, responda com base nas MENSAGENS. Se não souber por nenhum dos dois, diga que não sabe. Responda de forma direta e curta, em português.' +
     (topico === 'leitura' ? ' Nunca revele detalhes de enredo/trama, mesmo que pareça inofensivo.' : '') +
     `\n\nDADOS ATUAIS:\n${dados}`
-  const resposta = await chamarGroq(promptSistema, `MENSAGENS:\n${mensagens}\n\nPergunta: ${pergunta}`, 400)
+  const resposta = await chamarGroq(promptSistema, `MENSAGENS:\n${mensagens}\n\nPergunta: ${pergunta}`, 400, pegarHistorico(jid))
+  if (resposta) guardarTroca(jid, pergunta, resposta)
   await sock.sendMessage(jid, { text: resposta || 'Não consegui responder isso agora 😕' })
 }
