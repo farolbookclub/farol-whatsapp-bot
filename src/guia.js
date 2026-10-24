@@ -71,42 +71,44 @@ async function grupoTemMembro(sock, groupJid, jid) {
   }
 }
 
-async function enviarLinks(sock, jid, formato) {
+const COMANDOS_PV =
+  'Se precisar de ajuda, você pode enviar esses comandos aqui no PV:\n' +
+  '/resumo — resume o grupo Bate-papo\n' +
+  '/resumo_leitura — resume o grupo Leitura do mês\n' +
+  '/resumo_avisos — resume o grupo Avisos\n\n' +
+  'Ou se tiver alguma dúvida que eu saiba responder, é só perguntar!'
+
+// Última etapa do guia: confere de verdade (via groupMetadata) em quais
+// grupos a pessoa já está — manda link só do que realmente falta entrar,
+// em vez de confiar cegamente na flag ja_nos_grupos.
+async function finalizarGuia(sock, jid, formato) {
   const grupos = await gruposParaEnviar(formato)
   if (!grupos.length) {
     await sock.sendMessage(jid, { text: 'Ainda não tenho os grupos configurados — chama a Administração 💛' })
     return
   }
-  let texto = 'Agora é só entrar nos grupos (toca em cada link e pede pra entrar):\n\n'
-  for (const g of emOrdemDeTopico(grupos)) {
-    texto += await linhaLink(sock, g)
-  }
-  texto += '\nSe precisar de ajuda, você pode enviar esses comandos aqui no PV:\n'
-  texto += '/resumo — resume o grupo Bate-papo\n'
-  texto += '/resumo_leitura — resume o grupo Leitura do mês\n'
-  texto += '/resumo_avisos — resume o grupo Avisos\n\n'
-  texto += 'Ou se tiver alguma dúvida que eu saiba responder, é só perguntar!'
-  await sock.sendMessage(jid, { text: texto })
-}
-
-// Pra quem já foi adicionada direto nos grupos: avisa que já está vinculada
-// e, só se faltar algum grupo específico, manda o link dele.
-async function avisarJaNosGruposEConferirFaltantes(sock, jid, formato) {
-  const grupos = await gruposParaEnviar(formato)
+  const emOrdem = emOrdemDeTopico(grupos)
   const faltando = []
-  for (const g of emOrdemDeTopico(grupos)) {
+  for (const g of emOrdem) {
     const dentro = await grupoTemMembro(sock, g.group_jid, jid)
     if (!dentro) faltando.push(g)
   }
 
-  let texto = 'Vi que você já está nos grupos e já vinculei você aqui à sua inscrição — seja bem-vinda! 💛'
-  if (faltando.length) {
-    texto += '\n\nSó não te vi em:\n\n'
-    for (const g of faltando) {
-      texto += await linhaLink(sock, g)
-    }
+  if (!faltando.length) {
+    await sock.sendMessage(jid, {
+      text: 'Vi que você já está em todos os grupos — seja bem-vinda! 💛\n\nSe ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚',
+    })
+    return
   }
-  texto += '\n\nSe ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚'
+
+  const faltaTudo = faltando.length === emOrdem.length
+  let texto = faltaTudo
+    ? 'Agora é só entrar nos grupos (toca em cada link e pede pra entrar):\n\n'
+    : 'Vi que você já está em alguns grupos — só falta entrar em:\n\n'
+  for (const g of faltando) {
+    texto += await linhaLink(sock, g)
+  }
+  texto += `\n${COMANDOS_PV}`
   await sock.sendMessage(jid, { text: texto })
 }
 
@@ -126,7 +128,7 @@ export async function tentarAvancarGuia(sock, jid, texto) {
 
   const { data: membro } = await supabase
     .from('whatsapp_membros')
-    .select('guia_etapa, signup_id, ja_nos_grupos, signups (formato)')
+    .select('guia_etapa, signup_id, signups (formato)')
     .eq('jid', jid)
     .maybeSingle()
   const etapa = membro?.guia_etapa
@@ -177,11 +179,7 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   }
 
   if (etapa === 4) {
-    if (membro.ja_nos_grupos) {
-      await avisarJaNosGruposEConferirFaltantes(sock, jid, formato)
-    } else {
-      await enviarLinks(sock, jid, formato)
-    }
+    await finalizarGuia(sock, jid, formato)
     await supabase.from('whatsapp_membros').update({ guia_etapa: null }).eq('jid', jid)
     return true
   }
