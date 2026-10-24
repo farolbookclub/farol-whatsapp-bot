@@ -5,8 +5,8 @@ const SITE_URL = 'https://biofarol.vercel.app'
 const OK = '\nResponda Ok para prosseguir'
 // Fotos dos grupos (uma pra Presencial, outra pra Online), salvas localmente
 // no celular — não entram no repositório (tem número/nome de gente real).
-const FOTO_GRUPOS_PRESENCIAL = new URL('../assets/grupos-presencial.jpg', import.meta.url)
-const FOTO_GRUPOS_ONLINE = new URL('../assets/grupos-online.jpg', import.meta.url)
+const FOTO_GRUPOS_PRESENCIAL = new URL('../assets/grupos-presencial.png', import.meta.url)
+const FOTO_GRUPOS_ONLINE = new URL('../assets/grupos-online.png', import.meta.url)
 // Print do site de membras (ícone de instalar), mesma pasta local.
 const FOTO_SITE_MEMBRAS = new URL('../assets/site-membras.jpg', import.meta.url)
 
