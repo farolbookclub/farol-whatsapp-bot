@@ -1,7 +1,11 @@
+import fs from 'fs'
 import { supabase } from './supabase.js'
 
 const SITE_URL = 'https://biofarol.vercel.app'
 const OK = '\nResponda Ok para prosseguir'
+// Foto dos grupos (pra quem é do Presencial), salva localmente no celular —
+// não entra no repositório (tem número/nome de gente real). Ver README.
+const FOTO_GRUPOS_PRESENCIAL = new URL('../assets/grupos-presencial.jpg', import.meta.url)
 
 const GUIA_SITE =
   '✨ Site das membras: https://membrosfarol.vercel.app/\n' +
@@ -75,9 +79,15 @@ export async function tentarAvancarGuia(sock, jid, texto) {
       '📢 Avisos\n' +
       '💬 Bate-papo (falamos de tudo um pouco)\n' +
       '📚 Leitura do mês (falamos sobre a nossa leitura atual)' +
-      (presencial ? '\n\n☕ Como você é do Presencial, também tem o grupo do Presencial.' : '') +
+      (presencial ? '\n\n☕ Como você é do Presencial, também tem o grupo do Presencial (oculto para o resto da comunidade)' : '') +
       OK
-    await sock.sendMessage(jid, { text: texto2 })
+    // Pra quem é do Presencial, manda a foto dos grupos (se o arquivo existir
+    // no celular) com esse texto de legenda; senão, cai pro texto puro.
+    if (presencial && fs.existsSync(FOTO_GRUPOS_PRESENCIAL)) {
+      await sock.sendMessage(jid, { image: fs.readFileSync(FOTO_GRUPOS_PRESENCIAL), caption: texto2 })
+    } else {
+      await sock.sendMessage(jid, { text: texto2 })
+    }
     await supabase.from('whatsapp_membros').update({ guia_etapa: 2 }).eq('jid', jid)
     return true
   }
