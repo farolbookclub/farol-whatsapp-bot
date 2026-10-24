@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { GROQ_API_KEY } from './config.js'
+import { dadosAtuais } from './ia.js'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const RETENCAO_DIAS = { bate_papo: 10, leitura: 30, avisos: 30, presencial: 30 }
@@ -103,10 +104,16 @@ export async function gerarEEnviarResumo(sock, jid, topico) {
 }
 
 // Resposta de acompanhamento ("fala mais sobre X") logo depois de um resumo.
+// Além das mensagens do resumo, leva os DADOS ATUAIS reais (livro do mês,
+// encontros etc.) — senão a pergunta vira só sobre o que foi dito no grupo,
+// mesmo quando é algo como "qual o livro do mês" que tem resposta oficial.
 export async function responderFollowUpResumo(sock, jid, topico, mensagens, pergunta) {
-  const promptSistema = `Você acabou de resumir as mensagens do tópico "${NOME_TOPICO[topico]}" do Farol Book Club pra essa pessoa. ` +
-    'Agora ela quer saber mais sobre algo específico. Responda só com base nas mensagens abaixo, de forma direta e curta, em português.' +
-    (topico === 'leitura' ? ' Nunca revele detalhes de enredo/trama, mesmo que pareça inofensivo.' : '')
-  const resposta = await chamarGroq(promptSistema, `Mensagens:\n${mensagens}\n\nPergunta: ${pergunta}`, 400)
+  const dados = await dadosAtuais()
+  const promptSistema = `Você é o Faroleiro, o robô do Farol Book Club. Você acabou de resumir as mensagens do tópico "${NOME_TOPICO[topico]}" pra essa pessoa, e agora ela quer saber mais. ` +
+    'Primeiro confira se a pergunta tem resposta oficial nos DADOS ATUAIS (livro do mês, leitura extra, encontros, parceiros) — se tiver, responda com base neles. ' +
+    'Se for algo sobre o que foi conversado no grupo, responda com base nas MENSAGENS. Se não souber por nenhum dos dois, diga que não sabe. Responda de forma direta e curta, em português.' +
+    (topico === 'leitura' ? ' Nunca revele detalhes de enredo/trama, mesmo que pareça inofensivo.' : '') +
+    `\n\nDADOS ATUAIS:\n${dados}`
+  const resposta = await chamarGroq(promptSistema, `MENSAGENS:\n${mensagens}\n\nPergunta: ${pergunta}`, 400)
   await sock.sendMessage(jid, { text: resposta || 'Não consegui responder isso agora 😕' })
 }

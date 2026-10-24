@@ -148,7 +148,7 @@ async function leiturasAnteriores() {
 let dadosCache = ''
 let dadosCarregadosEm = 0
 
-async function dadosAtuais() {
+export async function dadosAtuais() {
   if (dadosCache && Date.now() - dadosCarregadosEm < 5 * 60_000) return dadosCache
 
   const agora = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date())
