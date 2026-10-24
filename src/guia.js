@@ -45,8 +45,11 @@ async function enviarLinks(sock, jid, formato) {
 }
 
 // Primeira etapa do guia (chamada logo depois de vincular a conta).
-export async function iniciarGuia(sock, jid, apelido) {
-  const texto = `Oii${apelido ? ' ' + apelido : ''}, tudo bem? Aqui é o Faroleiro, o robô do Farol 💛\n\nVou te mandar um guia do clube e, no final, o link pra entrar 💕${OK}`
+// jaNosGrupos: true pra quem já foi adicionada direto nos grupos pela
+// Administração (não precisa do link no final, só do guia mesmo).
+export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
+  const fim = jaNosGrupos ? 'Vou te mandar um guia do clube 💕' : 'Vou te mandar um guia do clube e, no final, o link pra entrar 💕'
+  const texto = `Oii${apelido ? ' ' + apelido : ''}, tudo bem? Aqui é o Faroleiro, o robô do Farol 💛\n\n${fim}${OK}`
   await sock.sendMessage(jid, { text: texto })
 }
 
@@ -57,7 +60,7 @@ export async function tentarAvancarGuia(sock, jid, texto) {
 
   const { data: membro } = await supabase
     .from('whatsapp_membros')
-    .select('guia_etapa, signup_id, signups (formato)')
+    .select('guia_etapa, signup_id, ja_nos_grupos, signups (formato)')
     .eq('jid', jid)
     .maybeSingle()
   const etapa = membro?.guia_etapa
@@ -92,7 +95,11 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   }
 
   if (etapa === 4) {
-    await enviarLinks(sock, jid, formato)
+    if (membro.ja_nos_grupos) {
+      await sock.sendMessage(jid, { text: 'Prontinho! Você já está nos grupos — qualquer dúvida, é só perguntar por aqui ou chamar a Administração 💛' })
+    } else {
+      await enviarLinks(sock, jid, formato)
+    }
     await supabase.from('whatsapp_membros').update({ guia_etapa: null }).eq('jid', jid)
     return true
   }

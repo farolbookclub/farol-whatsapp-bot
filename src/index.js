@@ -370,9 +370,9 @@ async function connectToWhatsApp() {
           if (encontrada) {
             const nome = encontrada.apelido || encontrada.nome
             try {
-              await sock.sendMessage(participantJid, { text: `Oii ${nome}! Reconheci seu número e já vinculei sua conta ao Farol 💛` })
+              await iniciarGuia(sock, participantJid, nome, true)
             } catch (erro) {
-              console.error('aviso de vínculo automático:', erro)
+              console.error('guia pós-vínculo automático:', erro)
             }
             await avisarAdminEntrouSaiu('entrou', { apelido: nome, formato: encontrada.formato })
           }

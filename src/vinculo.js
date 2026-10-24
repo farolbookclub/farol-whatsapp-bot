@@ -71,7 +71,7 @@ export async function vincularPorNumero(sock, jid) {
       if (resultado?.exists && (resultado.jid === jid || resultado.lid === jid)) {
         await supabase
           .from('whatsapp_membros')
-          .upsert({ jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10) }, { onConflict: 'jid' })
+          .upsert({ jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, ja_nos_grupos: true }, { onConflict: 'jid' })
         return c
       }
     } catch (erro) {
