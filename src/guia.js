@@ -14,12 +14,12 @@ const GUIA_SITE =
   '✨ *Site das membras:* https://membrosfarol.vercel.app/\n' +
   '```🔑 O código está fixado em Avisos.```\n\n' +
   '📲 Toque no ícone de download (circulado de amarelo no print) para instalar o Farol no celular 💕\n\n' +
-  '* 📖 *Leitura do mês* : veja o livro atual e seus gatilhos de conteúdo.\n' +
-  '* 📖 *Leitura extra* : veja nossa leitura extra (se houver) e seus gatilhos de conteúdo.\n' +
-  '* 📚 *Progresso* : registre sua leitura, deixe comentários, dê notas e favorite/abandone livros.\n' +
-  '* 🗂️ *Histórico* : onde fica seu progresso e os comentários das meninas (⚠️ pode conter spoilers).\n' +
-  '* 💌 *Clubinho* : onde você pode enviar sugestões, feedbacks ou denúncias.\n' +
-  '* 🔎 *E mais* : regras, livros anteriores, encontrinhos, membras, ferramentas, arquivos e parceiros!'
+  '* 📖 *Leitura do mês*: veja o livro atual e seus gatilhos de conteúdo.\n' +
+  '* 📖 *Leitura extra*: veja nossa leitura extra (se houver) e seus gatilhos de conteúdo.\n' +
+  '* 📚 *Progresso*: registre sua leitura, deixe comentários, dê notas e favorite/abandone livros.\n' +
+  '* 🗂️ *Histórico*: onde fica seu progresso e os comentários das meninas (⚠️ pode conter spoilers).\n' +
+  '* 💌 *Clubinho*: onde você pode enviar sugestões, feedbacks ou denúncias.\n' +
+  '* 🔎 *E mais*: regras, livros anteriores, encontrinhos, membras, ferramentas, arquivos e parceiros!'
 
 const GUIA_SPOILER =
   '*🤫 Spoiler*\n' +
