@@ -137,13 +137,13 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   if (etapa === 1) {
     const presencial = formato === 'presencial'
     const texto2 = presencial
-      ? 'Nossa comunidade é um grupo com estes tópicos:\n\n' +
+      ? 'Nossa comunidade é composta por esses grupos:\n\n' +
         '* 📢 *Avisos* (recados da administração)\n' +
         '* 💬 *Bate-papo* (falamos de tudo um pouco)\n' +
         '* 📚 *Leitura do mês* (falamos sobre a nossa leitura atual)\n' +
         '* ☕ *Presencial* (oculto para o resto da comunidade)' +
         OK
-      : 'Nossa comunidade é um grupo com estes tópicos:\n\n' +
+      : 'Nossa comunidade é composta por esses grupos:\n\n' +
         '* 📢 *Avisos* (recados da administração)\n' +
         '* 💬 *Bate-papo* (falamos de tudo um pouco)\n' +
         '* 📚 *Leitura do mês* (falamos sobre a nossa leitura atual)' +
