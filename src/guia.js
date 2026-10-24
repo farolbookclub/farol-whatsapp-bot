@@ -77,10 +77,10 @@ export async function tentarAvancarGuia(sock, jid, texto) {
     const presencial = formato === 'presencial'
     const texto2 = presencial
       ? 'Nossa comunidade é um grupo com estes tópicos:\n\n' +
-        '📢 Avisos\n' +
+        '📢 Avisos (recados da administração)\n' +
         '💬 Bate-papo (falamos de tudo um pouco)\n' +
-        '📚 Leitura do mês (falamos sobre a nossa leitura atual)\n\n' +
-        '☕ Como você é do Presencial, também tem o grupo do Presencial (oculto para o resto da comunidade)' +
+        '📚 Leitura do mês (falamos sobre a nossa leitura atual)\n' +
+        '☕ Presencial (oculto para o resto da comunidade)' +
         OK
       : 'Nossa comunidade é um grupo com estes tópicos:\n\n' +
         '📢 Avisos (recados da administração)\n' +
