@@ -67,8 +67,17 @@ async function textoNota(r, livro) {
 // vez e posta no grupo Leitura do mês. Progresso não revela comentário (link
 // pro site em vez de citar o texto); nota não tem comentário, então vai tudo.
 export async function checarProgressoLeitura(sock) {
-  const { data: estado } = await supabase.from('whatsapp_leitura_checagem').select('ultima_em').eq('id', 1).maybeSingle()
-  const desde = estado?.ultima_em || new Date(0).toISOString()
+  const { data: estado, error: erroEstado } = await supabase.from('whatsapp_leitura_checagem').select('ultima_em').eq('id', 1).maybeSingle()
+  // Se a consulta falhar (ex.: banco instável), não dá pra saber "desde
+  // quando" com segurança — melhor pular esta rodada do que arriscar tratar
+  // tudo como novo e disparar o histórico inteiro de uma vez.
+  if (erroEstado) {
+    console.error('checarProgressoLeitura (estado):', erroEstado.message)
+    return
+  }
+  // Nunca viu antes (primeira vez): começa a contar de agora, não do início
+  // dos tempos — senão despeja todo o histórico já existente.
+  const desde = estado?.ultima_em || new Date().toISOString()
   const agora = new Date().toISOString()
 
   const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid').eq('topico', 'leitura').eq('ativo', true)
