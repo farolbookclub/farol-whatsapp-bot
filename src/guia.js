@@ -3,9 +3,10 @@ import { supabase } from './supabase.js'
 
 const SITE_URL = 'https://biofarol.vercel.app'
 const OK = '\nResponda Ok para prosseguir'
-// Foto dos grupos (pra quem é do Presencial), salva localmente no celular —
-// não entra no repositório (tem número/nome de gente real). Ver README.
+// Fotos dos grupos (uma pra Presencial, outra pra Online), salvas localmente
+// no celular — não entram no repositório (tem número/nome de gente real).
 const FOTO_GRUPOS_PRESENCIAL = new URL('../assets/grupos-presencial.jpg', import.meta.url)
+const FOTO_GRUPOS_ONLINE = new URL('../assets/grupos-online.jpg', import.meta.url)
 
 const GUIA_SITE =
   '✨ Site das membras: https://membrosfarol.vercel.app/\n' +
@@ -74,17 +75,23 @@ export async function tentarAvancarGuia(sock, jid, texto) {
 
   if (etapa === 1) {
     const presencial = formato === 'presencial'
-    const texto2 =
-      'Nossa comunidade é um grupo com estes tópicos:\n\n' +
-      '📢 Avisos\n' +
-      '💬 Bate-papo (falamos de tudo um pouco)\n' +
-      '📚 Leitura do mês (falamos sobre a nossa leitura atual)' +
-      (presencial ? '\n\n☕ Como você é do Presencial, também tem o grupo do Presencial (oculto para o resto da comunidade)' : '') +
-      OK
-    // Pra quem é do Presencial, manda a foto dos grupos (se o arquivo existir
-    // no celular) com esse texto de legenda; senão, cai pro texto puro.
-    if (presencial && fs.existsSync(FOTO_GRUPOS_PRESENCIAL)) {
-      await sock.sendMessage(jid, { image: fs.readFileSync(FOTO_GRUPOS_PRESENCIAL), caption: texto2 })
+    const texto2 = presencial
+      ? 'Nossa comunidade é um grupo com estes tópicos:\n\n' +
+        '📢 Avisos\n' +
+        '💬 Bate-papo (falamos de tudo um pouco)\n' +
+        '📚 Leitura do mês (falamos sobre a nossa leitura atual)\n\n' +
+        '☕ Como você é do Presencial, também tem o grupo do Presencial (oculto para o resto da comunidade)' +
+        OK
+      : 'Nossa comunidade é um grupo com estes tópicos:\n\n' +
+        '📢 Avisos (recados da administração)\n' +
+        '💬 Bate-papo (falamos de tudo um pouco)\n' +
+        '📚 Leitura do mês (falamos sobre a nossa leitura atual)' +
+        OK
+    // Manda a foto dos grupos certa pro formato (se o arquivo existir no
+    // celular) com esse texto de legenda; senão, cai pro texto puro.
+    const foto = presencial ? FOTO_GRUPOS_PRESENCIAL : FOTO_GRUPOS_ONLINE
+    if (fs.existsSync(foto)) {
+      await sock.sendMessage(jid, { image: fs.readFileSync(foto), caption: texto2 })
     } else {
       await sock.sendMessage(jid, { text: texto2 })
     }
