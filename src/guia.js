@@ -96,7 +96,7 @@ export async function tentarAvancarGuia(sock, jid, texto) {
 
   if (etapa === 4) {
     if (membro.ja_nos_grupos) {
-      await sock.sendMessage(jid, { text: 'Prontinho! Você já está nos grupos — qualquer dúvida, é só perguntar por aqui ou chamar a Administração 💛' })
+      await sock.sendMessage(jid, { text: 'Prontinho! Você já está nos grupos — qualquer dúvida, é só perguntar por aqui ou chamar a Administração 💛 Se quiser, pode se apresentar no Bate-papo: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚' })
     } else {
       await enviarLinks(sock, jid, formato)
     }
