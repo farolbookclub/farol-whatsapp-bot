@@ -7,6 +7,8 @@ const OK = '\nResponda Ok para prosseguir'
 // no celular — não entram no repositório (tem número/nome de gente real).
 const FOTO_GRUPOS_PRESENCIAL = new URL('../assets/grupos-presencial.jpg', import.meta.url)
 const FOTO_GRUPOS_ONLINE = new URL('../assets/grupos-online.jpg', import.meta.url)
+// Print do site de membras (ícone de instalar), mesma pasta local.
+const FOTO_SITE_MEMBRAS = new URL('../assets/site-membras.jpg', import.meta.url)
 
 const GUIA_SITE =
   '✨ Site das membras: https://membrosfarol.vercel.app/\n' +
@@ -100,7 +102,11 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   }
 
   if (etapa === 2) {
-    await sock.sendMessage(jid, { text: `${GUIA_SITE}${OK}` })
+    if (fs.existsSync(FOTO_SITE_MEMBRAS)) {
+      await sock.sendMessage(jid, { image: fs.readFileSync(FOTO_SITE_MEMBRAS), caption: `${GUIA_SITE}${OK}` })
+    } else {
+      await sock.sendMessage(jid, { text: `${GUIA_SITE}${OK}` })
+    }
     await supabase.from('whatsapp_membros').update({ guia_etapa: 3 }).eq('jid', jid)
     return true
   }
