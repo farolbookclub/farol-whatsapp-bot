@@ -43,27 +43,70 @@ const ROTULO_TOPICO = {
 }
 const ORDEM_TOPICOS = ['avisos', 'bate_papo', 'leitura', 'presencial']
 
+function emOrdemDeTopico(grupos) {
+  return ORDEM_TOPICOS.map((t) => grupos.find((g) => g.topico === t)).filter(Boolean)
+}
+
+async function linhaLink(sock, g) {
+  try {
+    const codigo = await sock.groupInviteCode(g.group_jid)
+    return `* ${ROTULO_TOPICO[g.topico] || `*${g.nome}*:`} https://chat.whatsapp.com/${codigo}\n`
+  } catch (erro) {
+    console.error(`link do grupo ${g.nome}:`, erro)
+    return ''
+  }
+}
+
+// Confere se o jid já está de fato no grupo (pra quem foi adicionada direto
+// pela Administração, mas pode ter ficado de fora de algum). Se a checagem
+// falhar, assume que já está dentro — melhor não mandar link à toa do que
+// mandar errado.
+async function grupoTemMembro(sock, groupJid, jid) {
+  try {
+    const metadata = await sock.groupMetadata(groupJid)
+    return metadata.participants.some((p) => p.id === jid)
+  } catch (erro) {
+    console.error(`groupMetadata ${groupJid}:`, erro)
+    return true
+  }
+}
+
 async function enviarLinks(sock, jid, formato) {
   const grupos = await gruposParaEnviar(formato)
   if (!grupos.length) {
     await sock.sendMessage(jid, { text: 'Ainda não tenho os grupos configurados — chama a Administração 💛' })
     return
   }
-  const emOrdem = ORDEM_TOPICOS.map((t) => grupos.find((g) => g.topico === t)).filter(Boolean)
   let texto = 'Agora é só entrar nos grupos (toca em cada link e pede pra entrar):\n\n'
-  for (const g of emOrdem) {
-    try {
-      const codigo = await sock.groupInviteCode(g.group_jid)
-      texto += `* ${ROTULO_TOPICO[g.topico] || `*${g.nome}*:`} https://chat.whatsapp.com/${codigo}\n`
-    } catch (erro) {
-      console.error(`link do grupo ${g.nome}:`, erro)
-    }
+  for (const g of emOrdemDeTopico(grupos)) {
+    texto += await linhaLink(sock, g)
   }
   texto += '\nSe precisar de ajuda, você pode enviar esses comandos aqui no PV:\n'
   texto += '/resumo — resume o grupo Bate-papo\n'
   texto += '/resumo_leitura — resume o grupo Leitura do mês\n'
   texto += '/resumo_avisos — resume o grupo Avisos\n\n'
   texto += 'Ou se tiver alguma dúvida que eu saiba responder, é só perguntar!'
+  await sock.sendMessage(jid, { text: texto })
+}
+
+// Pra quem já foi adicionada direto nos grupos: avisa que já está vinculada
+// e, só se faltar algum grupo específico, manda o link dele.
+async function avisarJaNosGruposEConferirFaltantes(sock, jid, formato) {
+  const grupos = await gruposParaEnviar(formato)
+  const faltando = []
+  for (const g of emOrdemDeTopico(grupos)) {
+    const dentro = await grupoTemMembro(sock, g.group_jid, jid)
+    if (!dentro) faltando.push(g)
+  }
+
+  let texto = 'Vi que você já está nos grupos e já vinculei você aqui à sua inscrição — seja bem-vinda! 💛'
+  if (faltando.length) {
+    texto += '\n\nSó não te vi em:\n\n'
+    for (const g of faltando) {
+      texto += await linhaLink(sock, g)
+    }
+  }
+  texto += '\n\nSe ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚'
   await sock.sendMessage(jid, { text: texto })
 }
 
@@ -135,7 +178,7 @@ export async function tentarAvancarGuia(sock, jid, texto) {
 
   if (etapa === 4) {
     if (membro.ja_nos_grupos) {
-      await sock.sendMessage(jid, { text: 'Prontinho! Você já está nos grupos — qualquer dúvida, é só perguntar por aqui ou chamar a *Administração* 💛 Se quiser, pode se apresentar no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚' })
+      await avisarJaNosGruposEConferirFaltantes(sock, jid, formato)
     } else {
       await enviarLinks(sock, jid, formato)
     }
