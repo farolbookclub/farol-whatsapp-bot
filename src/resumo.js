@@ -113,7 +113,8 @@ export async function responderFollowUpResumo(sock, jid, topico, mensagens, perg
   const dados = await dadosAtuais()
   const promptSistema = `Você é o Faroleiro, o robô do Farol Book Club. Você acabou de resumir as mensagens do tópico "${NOME_TOPICO[topico]}" pra essa pessoa, e agora ela quer saber mais. ` +
     'Primeiro confira se a pergunta tem resposta oficial nos DADOS ATUAIS (livro do mês, leitura extra, encontros, parceiros) — se tiver, responda com base neles. ' +
-    'Se for algo sobre o que foi conversado no grupo, responda com base nas MENSAGENS. Se não souber por nenhum dos dois, diga que não sabe. Responda de forma direta e curta, em português.' +
+    'Se for algo sobre o que foi conversado no grupo, responda com base nas MENSAGENS. Se não souber por nenhum dos dois, diga que não sabe. Responda de forma direta e curta, em português. ' +
+    'Sobre data/horário/local de encontro: a ÚNICA fonte é a seção "PRÓXIMO ENCONTRO" dos DADOS ATUAIS. NUNCA deduza a data do encontro a partir de AVISOS RECENTES, das MENSAGENS ou de qualquer outra data mencionada (ex.: prazo de leitura) — só use uma data das MENSAGENS/AVISOS pra responder sobre encontro se disser literalmente que é a data do encontro.' +
     (topico === 'leitura' ? ' Nunca revele detalhes de enredo/trama, mesmo que pareça inofensivo.' : '') +
     `\n\nDADOS ATUAIS:\n${dados}`
   const resposta = await chamarGroq(promptSistema, `MENSAGENS:\n${mensagens}\n\nPergunta: ${pergunta}`, 400, pegarHistorico(jid))
