@@ -12,22 +12,37 @@ async function modeloIA() {
   return data?.ia_modelo || 'openai/gpt-oss-20b'
 }
 
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Tenta 1x e, se falhar (ex.: rate limit da Groq em chamadas seguidas, tipo
+// resumo + pergunta de acompanhamento em sequência), tenta mais uma vez
+// depois de um segundo antes de desistir.
 async function chamarGroq(promptSistema, conteudo, maxTokens, historico = []) {
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-    body: JSON.stringify({
-      model: await modeloIA(),
-      temperature: 0.3,
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: promptSistema },
-        ...historico,
-        { role: 'user', content: conteudo },
-      ],
-    }),
+  const corpo = JSON.stringify({
+    model: await modeloIA(),
+    temperature: 0.3,
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: promptSistema },
+      ...historico,
+      { role: 'user', content: conteudo },
+    ],
   })
-  const json = await r.json().catch(() => null)
+
+  let r, json
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+      body: corpo,
+    })
+    json = await r.json().catch(() => null)
+    if (r.ok && json?.choices?.[0]?.message?.content) break
+    if (tentativa === 1) await esperar(1000)
+  }
+
   const resposta = String(json?.choices?.[0]?.message?.content || '').trim()
   if (!r.ok || !resposta) console.error('Groq resumo:', r.status, JSON.stringify(json?.error ?? json))
   return resposta
@@ -91,11 +106,14 @@ export async function gerarEEnviarResumo(sock, jid, topico) {
   const linhas = mensagens.map((m) => `${m.apelido}: ${m.texto}`)
   const contexto = linhas.join('\n').slice(0, 12000)
 
-  const resposta = await chamarGroq(promptResumo(topico), `Mensagens de ${NOME_TOPICO[topico]} (mais antiga primeiro):\n${contexto}`, 500)
+  let resposta = await chamarGroq(promptResumo(topico), `Mensagens de ${NOME_TOPICO[topico]} (mais antiga primeiro):\n${contexto}`, 500)
   if (!resposta) {
     await sock.sendMessage(jid, { text: 'Tive um probleminha pra montar o resumo agora 😕 Tenta de novo daqui a pouco.' })
     return
   }
+  // A IA às vezes repete um título próprio mesmo mandada não fazer isso —
+  // como o título já vai separado logo abaixo, tira a 1ª linha se for um.
+  resposta = resposta.replace(/^\*?resumo (d[eo]|da)\b[^\n]*\n+/i, '').trim()
 
   const titulo = avisoLimite
     ? `✨ Resumo do ${NOME_TOPICO[topico]} (últimos ${RETENCAO_DIAS[topico]} dias — não tenho acesso anterior a isso)`

@@ -300,22 +300,32 @@ export async function perguntarIA(jid, pergunta) {
     return null
   }
 
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-    body: JSON.stringify({
-      model: config.ia_modelo,
-      temperature: 0.3,
-      max_tokens: String(config.ia_modelo).startsWith('openai/gpt-oss') ? 1500 : 400,
-      ...(String(config.ia_modelo).startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}),
-      messages: [
-        { role: 'system', content: promptIA(await dadosAtuais()) },
-        ...pegarHistorico(jid),
-        { role: 'user', content: pergunta },
-      ],
-    }),
+  const corpo = JSON.stringify({
+    model: config.ia_modelo,
+    temperature: 0.3,
+    max_tokens: String(config.ia_modelo).startsWith('openai/gpt-oss') ? 1500 : 400,
+    ...(String(config.ia_modelo).startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}),
+    messages: [
+      { role: 'system', content: promptIA(await dadosAtuais()) },
+      ...pegarHistorico(jid),
+      { role: 'user', content: pergunta },
+    ],
   })
-  const json = await r.json().catch(() => null)
+
+  // Tenta 1x e, se falhar (ex.: rate limit da Groq em chamadas seguidas),
+  // tenta de novo depois de 1s antes de desistir.
+  let r, json
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+      body: corpo,
+    })
+    json = await r.json().catch(() => null)
+    if (r.ok && json?.choices?.[0]?.message?.content) break
+    if (tentativa === 1) await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+
   const resposta = String(json?.choices?.[0]?.message?.content || '').trim()
   if (!r.ok || !resposta) {
     console.error('Groq:', r.status, JSON.stringify(json?.error ?? json))
