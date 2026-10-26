@@ -87,14 +87,17 @@ export async function gerarEEnviarResumo(sock, jid, topico) {
   if (!desde || desde < limiteRetencao) desde = limiteRetencao
   const avisoLimite = jaPediuAntes && new Date(acesso.ultimo_em) < limiteRetencao
 
-  const { data: mensagens, error } = await supabase
+  // Pega as mais RECENTES desde "desde" (não as mais antigas) — senão, com
+  // muita conversa no período, o assunto mais novo fica de fora do resumo.
+  const { data: recentes, error } = await supabase
     .from('whatsapp_mensagens')
     .select('apelido, texto, criado_em')
     .eq('topico', topico)
     .gte('criado_em', desde.toISOString())
-    .order('criado_em', { ascending: true })
+    .order('criado_em', { ascending: false })
     .limit(400)
   if (error) throw error
+  const mensagens = (recentes ?? []).slice().reverse()
 
   await supabase.from('whatsapp_resumo_ultimo_acesso').upsert({ jid, topico, ultimo_em: agora.toISOString() })
 
@@ -104,7 +107,9 @@ export async function gerarEEnviarResumo(sock, jid, topico) {
   }
 
   const linhas = mensagens.map((m) => `${m.apelido}: ${m.texto}`)
-  const contexto = linhas.join('\n').slice(0, 12000)
+  // Se ainda sobrar texto demais, corta do INÍCIO (mantém o final, mais
+  // recente) — mesma lógica de priorizar o que é mais novo.
+  const contexto = linhas.join('\n').slice(-12000)
 
   let resposta = await chamarGroq(promptResumo(topico), `Mensagens de ${NOME_TOPICO[topico]} (mais antiga primeiro):\n${contexto}`, 500)
   if (!resposta) {
