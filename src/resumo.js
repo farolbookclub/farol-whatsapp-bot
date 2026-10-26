@@ -38,7 +38,9 @@ const PROMPT_BASE =
   'Seja CONCRETO: cite os assuntos, nomes de livros, links, códigos, datas e decisões realmente mencionados nas mensagens — ' +
   'nunca escreva algo vago tipo "o clima está leve" ou "a conversa foi descontraída" sem dizer sobre o quê. ' +
   'Se não der pra ser específico porque as mensagens são curtas ou só risadas, diga isso em uma frase, sem enfeitar. ' +
-  'Nunca aponte quem não recebeu resposta, quem ficou quieta, ou qualquer coisa que possa soar como cobrança ou constranger alguém.'
+  'Nunca aponte quem não recebeu resposta, quem ficou quieta, ou qualquer coisa que possa soar como cobrança ou constranger alguém. ' +
+  'Não use formatação markdown (nada de **negrito**, # título, listas com - ou *): o WhatsApp não processa isso. Se precisar destacar algo, use *asterisco simples*. ' +
+  'Não escreva título nem comece com algo tipo "Resumo de..." — quem recebe a mensagem já viu um título antes dela; vá direto ao conteúdo.'
 
 function promptResumo(topico) {
   if (topico === 'leitura') {
