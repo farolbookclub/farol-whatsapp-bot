@@ -20,10 +20,16 @@ function esperar(ms) {
 // resumo + pergunta de acompanhamento em sequência), tenta mais uma vez
 // depois de um segundo antes de desistir.
 async function chamarGroq(promptSistema, conteudo, maxTokens, historico = []) {
+  const modelo = await modeloIA()
+  // Modelos gpt-oss gastam parte do limite de tokens "pensando" antes de
+  // responder — sem isso, a resposta visível vem cortada no meio (mesmo
+  // ajuste já feito pro fluxo de pergunta direta em ia.js).
+  const ehGptOss = String(modelo).startsWith('openai/gpt-oss')
   const corpo = JSON.stringify({
-    model: await modeloIA(),
+    model: modelo,
     temperature: 0.3,
-    max_tokens: maxTokens,
+    max_tokens: ehGptOss ? Math.max(maxTokens, 1500) : maxTokens,
+    ...(ehGptOss ? { reasoning_effort: 'low' } : {}),
     messages: [
       { role: 'system', content: promptSistema },
       ...historico,
