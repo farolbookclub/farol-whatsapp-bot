@@ -322,22 +322,28 @@ export async function processarInatividadeDiaria(sock) {
   const hoje = hojeSP()
   if (config.inatividade_checada_em_whatsapp === hoje) return
 
+  // Parabéns (pessoal, clube, Farol) só saem a partir das 10h — horário fixo,
+  // pra não depender de quando o bot der a sorte de conferir no dia. Antes
+  // disso, só pula (tenta de novo no próximo ciclo de 30 min).
+  const horaSP = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }).format(new Date()))
+  const podeParabenizar = horaSP >= 10
+
   // Parabéns do dia (independe do resto dar certo).
-  if (config.aniversarios_postados_em_whatsapp !== hoje) {
+  if (podeParabenizar && config.aniversarios_postados_em_whatsapp !== hoje) {
     try {
       await aniversarios(sock, hoje)
     } catch (erro) {
       console.error('aniversários (WhatsApp):', erro)
     }
   }
-  if (config.clube_aniversarios_postados_em_whatsapp !== hoje) {
+  if (podeParabenizar && config.clube_aniversarios_postados_em_whatsapp !== hoje) {
     try {
       await aniversariosClube(sock, hoje)
     } catch (erro) {
       console.error('aniversários de clube (WhatsApp):', erro)
     }
   }
-  if (config.farol_aniversario_postado_em_whatsapp !== hoje) {
+  if (podeParabenizar && config.farol_aniversario_postado_em_whatsapp !== hoje) {
     try {
       await aniversarioFarol(sock, hoje)
     } catch (erro) {
