@@ -219,6 +219,38 @@ async function aniversariosClube(sock, hoje) {
   return postados
 }
 
+const FAROL_FUNDACAO = '2024-08-15'
+
+// Aniversário do Farol (15/08, todo ano).
+async function aniversarioFarol(sock, hoje) {
+  if (hoje.slice(5) !== FAROL_FUNDACAO.slice(5)) return false
+  const anos = Number(hoje.slice(0, 4)) - Number(FAROL_FUNDACAO.slice(0, 4))
+  if (anos < 1) return false
+
+  const grupoJid = await grupoBatePapo()
+  if (!grupoJid) return false
+
+  const { count } = await supabase
+    .from('membras')
+    .select('id', { count: 'exact', head: true })
+    .is('saiu_em', null)
+    .or('entrou_em.not.is.null,importada.eq.true')
+
+  try {
+    await sock.sendMessage(grupoJid, {
+      text: `✨ Hoje é dia de comemorar: o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 🎉📚\n\n` +
+        `Desde 15 de agosto de 2024, reunimos divas apaixonadas por livros, compartilhamos leituras e criamos amizades lindas! 💛 Hoje somos ${count ?? 0} integrantes, e cada uma de vocês faz parte dessa história.\n\n` +
+        'Obrigada por estarem aqui e fazerem do nosso Farol um lugar tão especial! Que venham muitos outros anos de leituras, histórias, conversas, amizades e momentos incríveis juntas! 🫶🏻⚓🌊\n\n' +
+        'Com carinho,\n*Farol Book Club* ✨💛',
+    })
+  } catch (erro) {
+    console.error('aniversário do Farol:', erro)
+  }
+
+  await supabase.from('bot_config').update({ farol_aniversario_postado_em_whatsapp: hoje }).eq('id', 1)
+  return true
+}
+
 // Remoção real por inatividade. Devolve o texto do resultado pro log.
 async function remover(sock, jid, signupId, grupos, limite, hoje) {
   for (const g of grupos) {
@@ -281,6 +313,13 @@ export async function processarInatividadeDiaria(sock) {
       await aniversariosClube(sock, hoje)
     } catch (erro) {
       console.error('aniversários de clube (WhatsApp):', erro)
+    }
+  }
+  if (config.farol_aniversario_postado_em_whatsapp !== hoje) {
+    try {
+      await aniversarioFarol(sock, hoje)
+    } catch (erro) {
+      console.error('aniversário do Farol (WhatsApp):', erro)
     }
   }
 
