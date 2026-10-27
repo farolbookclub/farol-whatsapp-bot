@@ -9,6 +9,7 @@ import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
+import { processarAvisosAgendados } from './avisosAgendados.js'
 import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia } from './guia.js'
 import { perguntarIA } from './ia.js'
@@ -483,6 +484,11 @@ setInterval(() => {
 // próprio processarAvisosPendentes já espera 5s entre cada mensagem.
 setInterval(() => {
   if (sockAtual) processarAvisosPendentes(sockAtual).catch((e) => console.error('processar avisos:', e))
+}, 60 * 1000)
+
+// Avisos agendados pra um grupo (data/hora marcada): checa a cada 1 min.
+setInterval(() => {
+  if (sockAtual) processarAvisosAgendados(sockAtual).catch((e) => console.error('processar avisos agendados:', e))
 }, 60 * 1000)
 
 // Checagens de "quem falta" pedidas pelo painel admin: checa a cada 1 min.
