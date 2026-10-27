@@ -84,8 +84,16 @@ async function grupoBatePapo() {
   return data?.group_jid || null
 }
 
+// "A", "A e B", "A, B e C" — pra juntar nomes/menções numa frase só.
+function listaDisplay(itens) {
+  if (itens.length === 1) return itens[0]
+  if (itens.length === 2) return `${itens[0]} e ${itens[1]}`
+  return `${itens.slice(0, -1).join(', ')} e ${itens.at(-1)}`
+}
+
 // Parabéns no Bate-papo pra quem faz aniversário hoje. Só aprovadas e
 // vinculadas. Quem nasceu em 29/02 recebe em 28/02 nos anos não bissextos.
+// Se mais de uma fizer aniversário no mesmo dia, vai tudo numa mensagem só.
 async function aniversarios(sock, hoje) {
   const grupoJid = await grupoBatePapo()
   if (!grupoJid) return 0
@@ -101,28 +109,30 @@ async function aniversarios(sock, hoje) {
   const bissexto = (ano % 4 === 0 && ano % 100 !== 0) || ano % 400 === 0
   const diaMes = hoje.slice(5)
 
-  let postados = 0
+  const aniversariantes = []
   for (const m of membros ?? []) {
     const s = m.signups
     if (s?.status !== 'aprovado' || !s.aniversario) continue
     let niver = String(s.aniversario).slice(5, 10)
     if (niver === '02-29' && !bissexto) niver = '02-28'
     if (niver !== diaMes) continue
+    aniversariantes.push(m)
+  }
 
-    const nome = escaparMarcacao(s.apelido || s.nome)
+  if (aniversariantes.length > 0) {
+    const pessoas = aniversariantes.map((m) => `*${escaparMarcacao(m.signups.apelido || m.signups.nome)}* (@${numeroDoJid(m.jid)})`)
+    const texto = aniversariantes.length === 1
+      ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉 Parabéns, que seu novo ciclo seja cheio de livros incríveis e momentos lindos! 💕`
+      : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉 Parabéns, que o novo ciclo de vocês seja cheio de livros incríveis e momentos lindos! 💕`
     try {
-      await sock.sendMessage(grupoJid, {
-        text: `Hoje é aniversário da @${numeroDoJid(m.jid)}! 🎂🎉 ${nome}, parabéns, que seu novo ciclo seja cheio de livros incríveis e momentos lindos! 💕`,
-        mentions: [m.jid],
-      })
-      postados++
+      await sock.sendMessage(grupoJid, { text: texto, mentions: aniversariantes.map((m) => m.jid) })
     } catch (erro) {
-      console.error(`parabéns ${m.jid}:`, erro)
+      console.error('parabéns:', erro)
     }
   }
 
   await supabase.from('bot_config').update({ aniversarios_postados_em_whatsapp: hoje }).eq('id', 1)
-  return postados
+  return aniversariantes.length
 }
 
 const MESES_PT = {
@@ -190,28 +200,40 @@ async function aniversariosClube(sock, hoje) {
     if (data) entrouPorSignup.set(String(m.signup_id), data)
   }
 
-  let postados = 0
+  // Agrupa por marco igual (ex.: duas fazendo "1 mês" no mesmo dia) — cada
+  // grupo de marco igual vira 1 mensagem só; marcos diferentes (uma faz 1 mês
+  // e outra faz 1 ano no mesmo dia) continuam em mensagens separadas.
+  const porMarco = new Map()
   for (const m of membros ?? []) {
     if (!m.signup_id) continue
     const entrou = entrouPorSignup.get(m.signup_id)
     if (!entrou) continue
     const marco = marcoDoClube(entrou, hoje)
     if (!marco) continue
+    if (!porMarco.has(marco)) porMarco.set(marco, [])
+    porMarco.get(marco).push(m)
+  }
 
-    const s = m.signups
-    const apelido = escaparMarcacao(s?.apelido || s?.nome)
+  let postados = 0
+  for (const [marco, grupo] of porMarco) {
     const ehMeses = marco.includes('mês') || marco.includes('meses')
+    const pessoas = grupo.map((m) => `*${escaparMarcacao(m.signups?.apelido || m.signups?.nome)}* (@${numeroDoJid(m.jid)})`)
+    const nomes = grupo.map((m) => escaparMarcacao(m.signups?.apelido || m.signups?.nome))
+    const singular = grupo.length === 1
+
+    const texto = singular
+      ? `🎉✨ Hoje é dia de comemorar! A ${pessoas[0]} completa ${marco} de clubinho! 🥳💛\n\n` +
+        `Parabéns, ${nomes[0]}! 🎂🌟 Obrigada por fazer parte dessa história e por estar com a gente! Amamos ter você no nosso Farol e ficamos muito felizes em ter você por aqui! 🫶🏻💖\n\n` +
+        `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`
+      : `🎉✨ Hoje é dia de comemorar! ${listaDisplay(pessoas)} completam ${marco} de clubinho! 🥳💛\n\n` +
+        `Parabéns, ${listaDisplay(nomes)}! 🎂🌟 Obrigada por fazerem parte dessa história e por estarem com a gente! Amamos ter vocês no nosso Farol e ficamos muito felizes em ter vocês por aqui! 🫶🏻💖\n\n` +
+        `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`
 
     try {
-      await sock.sendMessage(grupoJid, {
-        text: `🎉✨ Hoje é dia de comemorar! A @${numeroDoJid(m.jid)} completa ${marco} de clubinho! 🥳💛\n\n` +
-          `Parabéns, ${apelido}! 🎂🌟 Obrigada por fazer parte dessa história e por estar com a gente! Amamos ter você no nosso Farol e ficamos muito felizes em ter você por aqui! 🫶🏻💖\n\n` +
-          `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`,
-        mentions: [m.jid],
-      })
-      postados++
+      await sock.sendMessage(grupoJid, { text: texto, mentions: grupo.map((m) => m.jid) })
+      postados += grupo.length
     } catch (erro) {
-      console.error(`clube ${m.jid}:`, erro)
+      console.error(`clube ${marco}:`, erro)
     }
   }
 
