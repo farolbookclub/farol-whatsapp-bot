@@ -72,11 +72,11 @@ async function grupoTemMembro(sock, groupJid, jid) {
 }
 
 const COMANDOS_PV =
-  'Se precisar de ajuda, você pode enviar esses comandos aqui no PV:\n' +
+  'Se precisar de ajuda, pode me mandar esses comandos aqui no privado:\n' +
   '/resumo — resume o grupo Bate-papo\n' +
   '/resumo_leitura — resume o grupo Leitura do mês\n' +
-  '/resumo_avisos — resume o grupo Avisos\n\n' +
-  'Ou se tiver alguma dúvida que eu saiba responder, é só perguntar!'
+  '/resumo_avisos — resume o grupo Avisos\n' +
+  '/duvida — pergunte algo (leitura do mês, data/horário/local do encontro etc.)'
 
 // Última etapa do guia: confere de verdade (via groupMetadata) em quais
 // grupos a pessoa já está — manda link só do que realmente falta entrar,
@@ -96,7 +96,9 @@ async function finalizarGuia(sock, jid, formato) {
 
   if (!faltando.length) {
     await sock.sendMessage(jid, {
-      text: 'Vi que você já está em todos os grupos — seja bem-vinda! 💛\n\nSe ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚',
+      text: 'Vi que você já está em todos os grupos — seja bem-vinda! 💛\n\n' +
+        'Se ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚\n\n' +
+        COMANDOS_PV,
     })
     return
   }
