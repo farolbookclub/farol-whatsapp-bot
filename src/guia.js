@@ -73,10 +73,10 @@ async function grupoTemMembro(sock, groupJid, jid) {
 
 const COMANDOS_PV =
   'Se precisar de ajuda, pode me mandar esses comandos aqui no privado:\n' +
-  '/resumo — resume o grupo Bate-papo\n' +
-  '/resumo_leitura — resume o grupo Leitura do mês\n' +
-  '/resumo_avisos — resume o grupo Avisos\n' +
-  '/duvida — pergunte algo (leitura do mês, data/horário/local do encontro etc.)'
+  '/resumo — te envio um breve resumo do grupo Bate-papo\n' +
+  '/resumo_leitura — te envio um breve resumo do grupo Leitura do mês (sem spoilers)\n' +
+  '/resumo_avisos — te envio um breve resumo dos Avisos\n' +
+  '/duvida + sua pergunta — tento te ajudar 💖'
 
 // Última etapa do guia: confere de verdade (via groupMetadata) em quais
 // grupos a pessoa já está — manda link só do que realmente falta entrar,
@@ -84,7 +84,7 @@ const COMANDOS_PV =
 async function finalizarGuia(sock, jid, formato) {
   const grupos = await gruposParaEnviar(formato)
   if (!grupos.length) {
-    await sock.sendMessage(jid, { text: 'Ainda não tenho os grupos configurados — chama a Administração 💛' })
+    await sock.sendMessage(jid, { text: 'Ainda não tenho os grupos configurados — chama a Administração 💖' })
     return
   }
   const emOrdem = emOrdemDeTopico(grupos)
@@ -96,7 +96,7 @@ async function finalizarGuia(sock, jid, formato) {
 
   if (!faltando.length) {
     await sock.sendMessage(jid, {
-      text: 'Vi que você já está em todos os grupos — seja bem-vinda! 💛\n\n' +
+      text: 'Vi que você já está em todos os grupos — seja bem-vinda! 💖\n\n' +
         'Se ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚\n\n' +
         COMANDOS_PV,
     })
@@ -119,7 +119,7 @@ async function finalizarGuia(sock, jid, formato) {
 // Administração (não precisa do link no final, só do guia mesmo).
 export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
   const fim = jaNosGrupos ? 'Vou te mandar um guia do clube 💕' : 'Vou te mandar um guia do clube antes de você entrar 💕'
-  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}, tudo bem? Aqui é o *Faroleiro*, o *robô* do *Farol* 💛\n${fim}${OK}`
+  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}, tudo bem? Aqui é o *Faroleiro*, o *robô* do *Farol* 💖\n${fim}${OK}`
   await sock.sendMessage(jid, { text: texto })
 }
 

@@ -20,9 +20,9 @@ import { processarInatividadeDiaria } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
 
 const AJUDA_COMANDOS =
-  '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/duvida — pergunte algo (leitura do mês, data/horário/local do encontro etc.)'
+  '/resumo — te envio um breve resumo do Bate-papo\n/resumo_leitura — te envio um breve resumo da Leitura do mês (sem spoilers)\n/resumo_avisos — te envio um breve resumo dos Avisos\n/duvida + sua pergunta — tento te ajudar 💖'
 
-const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💛 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
+const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💖 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
 
 // Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
 let sockAtual = null
@@ -45,7 +45,7 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'approve')
     try {
       const meta = await sock.groupMetadata(groupJid)
-      await sock.sendMessage(participantJid, { text: `Pronto, você entrou no ${meta.subject}! 🎉 Seja bem-vinda 💛` })
+      await sock.sendMessage(participantJid, { text: `Pronto, você entrou no ${meta.subject}! 🎉 Seja bem-vinda 💖` })
     } catch (erro) {
       console.error('aviso de entrada:', erro)
     }
@@ -85,7 +85,7 @@ function comandoResumoMatch(texto) {
 async function comandoResumo(sock, jid, topicoForcado) {
   const inscricao = await inscricaoDoJid(jid)
   if (!inscricao) {
-    await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💛' })
+    await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💖' })
     return
   }
   await gerarEEnviarResumo(sock, jid, topicoForcado || 'bate_papo')
@@ -172,7 +172,7 @@ async function handleGroupMessage(sock, m, groupJid) {
     if (!admin) return
     const { nomeGrupo, semVinculo, naoNoGrupo } = await membrosFaltando(sock, groupJid)
     let texto2 = `Checagem do grupo "${nomeGrupo}":\n\n`
-    texto2 += naoNoGrupo.length ? `Aprovadas e vinculadas, mas não estão aqui (${naoNoGrupo.length}):\n${naoNoGrupo.join(', ')}` : 'Todas as vinculadas já estão aqui 💛'
+    texto2 += naoNoGrupo.length ? `Aprovadas e vinculadas, mas não estão aqui (${naoNoGrupo.length}):\n${naoNoGrupo.join(', ')}` : 'Todas as vinculadas já estão aqui 💖'
     if (semVinculo.length) texto2 += `\n\nAprovadas mas ainda sem WhatsApp vinculado (${semVinculo.length}):\n${semVinculo.join(', ')}`
     await sock.sendMessage(groupJid, { text: texto2 })
     return
@@ -252,7 +252,7 @@ async function handleDM(sock, m, jid) {
   if (comandoDuvida) {
     const inscricao = await inscricaoDoJid(jid)
     if (!inscricao) {
-      await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💛' })
+      await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💖' })
       return
     }
     try {
@@ -335,7 +335,7 @@ async function connectToWhatsApp() {
       console.log('Conexão caiu.', deslogado ? 'Deslogado — escaneie o QR de novo.' : 'Reconectando...')
       if (!deslogado) connectToWhatsApp()
     } else if (connection === 'open') {
-      console.log('Conectado ao WhatsApp! 💛')
+      console.log('Conectado ao WhatsApp! 💖')
       console.log('[eu]', JSON.stringify(sock.user))
       sockAtual = sock
       try {

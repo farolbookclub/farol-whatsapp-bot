@@ -222,10 +222,10 @@ async function aniversariosClube(sock, hoje) {
     const singular = grupo.length === 1
 
     const texto = singular
-      ? `🎉✨ Hoje é dia de comemorar! A ${pessoas[0]} completa ${marco} de clubinho! 🥳💛\n\n` +
+      ? `🎉✨ Hoje é dia de comemorar! A ${pessoas[0]} completa ${marco} de clubinho! 🥳💖\n\n` +
         `Parabéns, ${nomes[0]}! 🎂🌟 Obrigada por fazer parte dessa história e por estar com a gente! Amamos ter você no nosso Farol e ficamos muito felizes em ter você por aqui! 🫶🏻💖\n\n` +
         `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`
-      : `🎉✨ Hoje é dia de comemorar! ${listaDisplay(pessoas)} completam ${marco} de clubinho! 🥳💛\n\n` +
+      : `🎉✨ Hoje é dia de comemorar! ${listaDisplay(pessoas)} completam ${marco} de clubinho! 🥳💖\n\n` +
         `Parabéns, ${listaDisplay(nomes)}! 🎂🌟 Obrigada por fazerem parte dessa história e por estarem com a gente! Amamos ter vocês no nosso Farol e ficamos muito felizes em ter vocês por aqui! 🫶🏻💖\n\n` +
         `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`
 
@@ -261,9 +261,9 @@ async function aniversarioFarol(sock, hoje) {
   try {
     await sock.sendMessage(grupoJid, {
       text: `✨ Hoje é dia de comemorar: o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 🎉📚\n\n` +
-        `Desde 15 de agosto de 2024, reunimos divas apaixonadas por livros, compartilhamos leituras e criamos amizades lindas! 💛 Hoje somos ${count ?? 0} integrantes, e cada uma de vocês faz parte dessa história.\n\n` +
+        `Desde 15 de agosto de 2024, reunimos divas apaixonadas por livros, compartilhamos leituras e criamos amizades lindas! 💖 Hoje somos ${count ?? 0} integrantes, e cada uma de vocês faz parte dessa história.\n\n` +
         'Obrigada por estarem aqui e fazerem do nosso Farol um lugar tão especial! Que venham muitos outros anos de leituras, histórias, conversas, amizades e momentos incríveis juntas! 🫶🏻⚓🌊\n\n' +
-        'Com carinho,\n*Farol Book Club* ✨💛',
+        'Com carinho,\n*Farol Book Club* ✨💖',
     })
   } catch (erro) {
     console.error('aniversário do Farol:', erro)

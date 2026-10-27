@@ -102,7 +102,7 @@ export async function gerarEEnviarResumo(sock, jid, topico) {
   await supabase.from('whatsapp_resumo_ultimo_acesso').upsert({ jid, topico, ultimo_em: agora.toISOString() })
 
   if (!mensagens || mensagens.length === 0) {
-    await sock.sendMessage(jid, { text: `Não teve conversa nova em ${NOME_TOPICO[topico]} nesse período 💛` })
+    await sock.sendMessage(jid, { text: `Não teve conversa nova em ${NOME_TOPICO[topico]} nesse período 💖` })
     return
   }
 
