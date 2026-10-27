@@ -9,7 +9,7 @@ import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
-import { PADRAO_SPOILER, guardarSpoiler, buscarUltimoSpoiler } from './spoiler.js'
+import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia } from './guia.js'
 import { perguntarIA } from './ia.js'
 import { membrosFaltando, processarChecagensPendentes } from './faltando.js'
@@ -20,7 +20,7 @@ import { processarInatividadeDiaria } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
 
 const AJUDA_COMANDOS =
-  '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/spoiler — mostra o último spoiler guardado'
+  '/resumo — resume o Bate-papo\n/resumo_leitura — resume a Leitura do mês\n/resumo_avisos — resume os Avisos\n/duvida — pergunte algo (leitura do mês, data/horário/local do encontro etc.)'
 
 const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💛 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
 
@@ -248,16 +248,19 @@ async function handleDM(sock, m, jid) {
     return
   }
 
-  if (/^\/spoiler$/i.test(texto)) {
+  const comandoDuvida = texto.match(/^\/duvida\s+([\s\S]+)/i)
+  if (comandoDuvida) {
     const inscricao = await inscricaoDoJid(jid)
     if (!inscricao) {
       await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💛' })
       return
     }
-    const ultimo = await buscarUltimoSpoiler('leitura')
-    await sock.sendMessage(jid, {
-      text: ultimo ? `🤫 Spoiler de ${ultimo.apelido}:\n\n${ultimo.texto}` : 'Não tem nenhum spoiler guardado ainda.',
-    })
+    try {
+      const resposta = await perguntarIA(jid, comandoDuvida[1].trim())
+      if (resposta) await sock.sendMessage(jid, { text: resposta })
+    } catch (erro) {
+      console.error('IA (/duvida):', erro)
+    }
     return
   }
 
