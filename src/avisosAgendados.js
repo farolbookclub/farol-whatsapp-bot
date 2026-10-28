@@ -51,19 +51,27 @@ async function signupsDoTipo(aviso) {
 // todas/online/presencial/selecionadas (manda no privado de cada uma, com
 // intervalo, igual o avisos.js).
 export async function processarAvisosAgendados(sock) {
-  const { data: aviso, error } = await supabase
+  // Só processa 1 por rodada (a próxima só entra no ciclo de 1 min seguinte,
+  // com os 5s de intervalo entre mensagens dentro de cada um) — nunca manda
+  // tudo de uma vez. Quando duas caem no mesmo horário, o grupo vai primeiro
+  // (prioridade explícita, não depende de ordem alfabética do tipo).
+  const { data: candidatos, error } = await supabase
     .from('whatsapp_avisos_agendados')
-    .select('id, tipo, topico, signup_ids, mensagem')
+    .select('id, tipo, topico, signup_ids, mensagem, enviar_em, criado_em')
     .eq('status', 'pendente')
     .lte('enviar_em', new Date().toISOString())
     .order('enviar_em', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+    .limit(10)
   if (error) {
     console.error('processarAvisosAgendados (busca):', error.message)
     return
   }
-  if (!aviso) return
+  if (!candidatos?.length) return
+
+  const aviso = candidatos.sort((a, b) => {
+    const prioridade = (x) => (x.tipo === 'grupo' ? 0 : 1)
+    return a.enviar_em.localeCompare(b.enviar_em) || prioridade(a) - prioridade(b) || a.criado_em.localeCompare(b.criado_em)
+  })[0]
 
   await supabase.from('whatsapp_avisos_agendados').update({ status: 'processando' }).eq('id', aviso.id)
 
