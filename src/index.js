@@ -6,7 +6,7 @@ import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
 import { supabase } from './supabase.js'
-import { WHATSAPP_PHONE_NUMBER, PUSH_SECRET } from './config.js'
+import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
@@ -231,12 +231,11 @@ async function handleDM(sock, m, jid) {
   const texto = textoDaMensagem(m).trim()
 
   // Registro único da admin (pra saber pra quem mandar os pedidos de
-  // aprovação de remoção por inatividade) — qualquer uma que souber o
-  // PUSH_SECRET (mesmo segredo já usado no push do painel admin) pode se
-  // registrar/trocar o número com isso.
-  const comandoSouAdmin = texto.match(/^!souadmin\s+(\S+)$/i)
-  if (comandoSouAdmin) {
-    if (!PUSH_SECRET || comandoSouAdmin[1] !== PUSH_SECRET) return
+  // aprovação de remoção por inatividade). Só funciona enquanto nenhuma
+  // admin foi registrada ainda — depois disso, só muda direto no banco.
+  if (/^!souadmin$/i.test(texto)) {
+    const { data: atual } = await supabase.from('bot_config').select('admin_jid_whatsapp').eq('id', 1).maybeSingle()
+    if (atual?.admin_jid_whatsapp) return
     await supabase.from('bot_config').update({ admin_jid_whatsapp: jid }).eq('id', 1)
     await sock.sendMessage(jid, { text: 'Prontinho, salvei você como admin pra receber os pedidos de aprovação de remoção 💖' })
     return
