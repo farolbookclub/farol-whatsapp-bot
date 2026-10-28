@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { avisarAdminErro } from './pushAdmin.js'
 
 // Verificação diária de inatividade (mesma regra do Telegram, Termo v1.1,
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
@@ -310,6 +311,72 @@ async function remover(sock, jid, signupId, grupos, limite, hoje) {
     : `removida; sem inscrição vinculada${avisoOk ? '' : ' (aviso não entregue)'}`
 }
 
+const CHARS_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // sem 0/O/1/I, pra não confundir no zap
+function gerarCodigo() {
+  let c = ''
+  for (let i = 0; i < 4; i++) c += CHARS_CODIGO[Math.floor(Math.random() * CHARS_CODIGO.length)]
+  return c
+}
+
+function textoAprovacao(nome, dias, codigo) {
+  return `⚠️ *Remoção por inatividade*\n\n*${nome}* está há ${dias} dias sem interagir e já recebeu o lembrete — pelas regras, seria removida agora.\n\n` +
+    `Responda aqui no meu privado:\n• *!aprovar ${codigo}* — remove agora\n• *!adiar ${codigo} <dias>* — adia por esses dias (ex: !adiar ${codigo} 7)`
+}
+
+// Pede aprovação da admin em vez de remover direto. Só manda de novo depois
+// que ela responder (ou o prazo do adiamento passar) — nunca todo ciclo.
+async function pedirAprovacaoRemocao(sock, adminJid, m, nome, dias) {
+  const codigo = gerarCodigo()
+  try {
+    await sock.sendMessage(adminJid, { text: textoAprovacao(nome, dias, codigo) })
+  } catch (erro) {
+    console.error(`pedido de aprovação de remoção ${m.jid}:`, erro)
+    return 'erro ao avisar a admin'
+  }
+  await supabase.from('whatsapp_membros').update({ remocao_pedida_em: hojeSP(), remocao_codigo: codigo }).eq('jid', m.jid)
+  return 'aprovação de remoção solicitada à admin'
+}
+
+// Chamado pelo comando "!aprovar <codigo>" no privado da admin.
+export async function confirmarRemocaoPorCodigo(sock, codigo) {
+  const { data: m } = await supabase
+    .from('whatsapp_membros')
+    .select('jid, signup_id, signups (apelido, nome)')
+    .eq('remocao_codigo', codigo.toUpperCase())
+    .is('removido_em', null)
+    .maybeSingle()
+  if (!m) return null
+
+  const { data: config } = await supabase.from('bot_config').select('dias_limite').eq('id', 1).single()
+  const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid, nome').eq('ativo', true)
+  const nome = m.signups?.apelido || m.signups?.nome || 'ela'
+  const resultado = await remover(sock, m.jid, m.signup_id, grupos ?? [], config?.dias_limite ?? 30, hojeSP())
+  await supabase.from('whatsapp_inatividade_log').insert({
+    jid: m.jid, signup_id: m.signup_id, data_referencia: hojeSP(), modo: 'real', resultado: `aprovada pela admin; ${resultado}`,
+  })
+  return nome
+}
+
+// Chamado pelo comando "!adiar <codigo> <dias>" no privado da admin.
+export async function adiarRemocaoPorCodigo(codigo, dias) {
+  const { data: m } = await supabase
+    .from('whatsapp_membros')
+    .select('jid, signups (apelido, nome)')
+    .eq('remocao_codigo', codigo.toUpperCase())
+    .is('removido_em', null)
+    .maybeSingle()
+  if (!m) return null
+
+  const data = new Date()
+  data.setDate(data.getDate() + dias)
+  const adiadaAte = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(data)
+
+  await supabase.from('whatsapp_membros')
+    .update({ remocao_adiada_ate: adiadaAte, remocao_pedida_em: null, remocao_codigo: null })
+    .eq('jid', m.jid)
+  return { nome: m.signups?.apelido || m.signups?.nome || 'ela', ate: adiadaAte }
+}
+
 // Roda 1x por dia (controlado por bot_config.inatividade_checada_em_whatsapp).
 export async function processarInatividadeDiaria(sock) {
   const { data: config, error: erroConfig } = await supabase.from('bot_config').select('*').eq('id', 1).single()
@@ -373,7 +440,7 @@ export async function processarInatividadeDiaria(sock) {
 
   const { data: membros, error: erroMembros } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signup_id, ultima_interacao, entrou_em, lembrete_ref')
+    .select('jid, signup_id, ultima_interacao, entrou_em, lembrete_ref, remocao_pedida_em, remocao_adiada_ate, signups (apelido, nome)')
     .is('removido_em', null)
   if (erroMembros) {
     console.error('processarInatividadeDiaria (membros):', erroMembros.message)
@@ -405,7 +472,20 @@ export async function processarInatividadeDiaria(sock) {
         logs.push({ ...base, resultado: 'seria removida' })
         continue
       }
-      logs.push({ ...base, resultado: await remover(sock, m.jid, m.signup_id, grupos ?? [], config.dias_limite, hoje) })
+      // Em vez de remover direto, pede aprovação da admin — só avisa de novo
+      // quando ela responder (!aprovar/!adiar) ou o prazo adiado passar.
+      if (m.remocao_adiada_ate && hoje < m.remocao_adiada_ate) {
+        logs.push({ ...base, resultado: `adiada até ${m.remocao_adiada_ate}` })
+        continue
+      }
+      if (m.remocao_pedida_em === hoje) continue // já pedida hoje, esperando resposta
+      if (!config.admin_jid_whatsapp) {
+        await avisarAdminErro('remoção por inatividade pendente, mas admin_jid_whatsapp não está configurado (bot_config)')
+        logs.push({ ...base, resultado: 'erro: admin_jid_whatsapp não configurado' })
+        continue
+      }
+      const nome = m.signups?.apelido || m.signups?.nome || 'ela'
+      logs.push({ ...base, resultado: await pedirAprovacaoRemocao(sock, config.admin_jid_whatsapp, m, nome, dias) })
       continue
     }
 

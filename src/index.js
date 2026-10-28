@@ -6,7 +6,7 @@ import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
 import { supabase } from './supabase.js'
-import { WHATSAPP_PHONE_NUMBER } from './config.js'
+import { WHATSAPP_PHONE_NUMBER, PUSH_SECRET } from './config.js'
 import { checarProgressoLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
@@ -17,7 +17,7 @@ import { membrosFaltando, processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
-import { processarInatividadeDiaria } from './inatividade.js'
+import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
 
 const AJUDA_COMANDOS =
@@ -229,6 +229,39 @@ async function handleGroupMessage(sock, m, groupJid) {
 
 async function handleDM(sock, m, jid) {
   const texto = textoDaMensagem(m).trim()
+
+  // Registro único da admin (pra saber pra quem mandar os pedidos de
+  // aprovação de remoção por inatividade) — qualquer uma que souber o
+  // PUSH_SECRET (mesmo segredo já usado no push do painel admin) pode se
+  // registrar/trocar o número com isso.
+  const comandoSouAdmin = texto.match(/^!souadmin\s+(\S+)$/i)
+  if (comandoSouAdmin) {
+    if (!PUSH_SECRET || comandoSouAdmin[1] !== PUSH_SECRET) return
+    await supabase.from('bot_config').update({ admin_jid_whatsapp: jid }).eq('id', 1)
+    await sock.sendMessage(jid, { text: 'Prontinho, salvei você como admin pra receber os pedidos de aprovação de remoção 💖' })
+    return
+  }
+
+  const { data: configAdmin } = await supabase.from('bot_config').select('admin_jid_whatsapp').eq('id', 1).maybeSingle()
+  const ehAdmin = configAdmin?.admin_jid_whatsapp === jid
+
+  const comandoAprovar = texto.match(/^!aprovar\s+([a-z0-9]{4})$/i)
+  if (comandoAprovar) {
+    if (!ehAdmin) return
+    const nome = await confirmarRemocaoPorCodigo(sock, comandoAprovar[1])
+    await sock.sendMessage(jid, { text: nome ? `Pronto, removi a ${nome} 💔` : 'Não achei nenhum pedido pendente com esse código.' })
+    return
+  }
+
+  const comandoAdiar = texto.match(/^!adiar\s+([a-z0-9]{4})\s+(\d+)$/i)
+  if (comandoAdiar) {
+    if (!ehAdmin) return
+    const resultado = await adiarRemocaoPorCodigo(comandoAdiar[1], Number(comandoAdiar[2]))
+    await sock.sendMessage(jid, {
+      text: resultado ? `Combinado, adiei a remoção da ${resultado.nome} até ${resultado.ate} 💖` : 'Não achei nenhum pedido pendente com esse código.',
+    })
+    return
+  }
 
   const comandoStart = texto.match(/^\/start\s+([0-9a-f-]{36})$/i)
   if (comandoStart) {
