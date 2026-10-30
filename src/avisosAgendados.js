@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { conteudoMensagem } from './midia.js'
 
 const INTERVALO_MS = 5000 // 5s entre mensagens, pra não levar ban por flood
 
@@ -8,7 +9,7 @@ function esperar(ms) {
 
 // Manda no privado de uma lista de signups (mesma lógica do avisos.js, mas
 // reaproveitável pros vários tipos de destinatário aqui).
-async function enviarParaSignups(sock, mensagem, signups) {
+async function enviarParaSignups(sock, aviso, signups) {
   const { data: membros } = await supabase.from('whatsapp_membros').select('jid, signup_id').is('removido_em', null)
   const jidPorSignup = new Map((membros ?? []).map((m) => [m.signup_id, m.jid]))
 
@@ -23,7 +24,7 @@ async function enviarParaSignups(sock, mensagem, signups) {
       continue
     }
     try {
-      await sock.sendMessage(jid, { text: mensagem })
+      await sock.sendMessage(jid, conteudoMensagem(aviso))
       enviados++
     } catch (erro) {
       falhas.push({ nome, motivo: erro?.message || 'falha ao enviar' })
@@ -57,7 +58,7 @@ export async function processarAvisosAgendados(sock) {
   // (prioridade explícita, não depende de ordem alfabética do tipo).
   const { data: candidatos, error } = await supabase
     .from('whatsapp_avisos_agendados')
-    .select('id, tipo, topico, signup_ids, mensagem, enviar_em, criado_em')
+    .select('id, tipo, topico, signup_ids, mensagem, midia_url, midia_mime, midia_nome, enviar_em, criado_em')
     .eq('status', 'pendente')
     .lte('enviar_em', new Date().toISOString())
     .order('enviar_em', { ascending: true })
@@ -92,7 +93,7 @@ export async function processarAvisosAgendados(sock) {
     }
 
     try {
-      await sock.sendMessage(grupo.group_jid, { text: aviso.mensagem })
+      await sock.sendMessage(grupo.group_jid, conteudoMensagem(aviso))
       await supabase.from('whatsapp_avisos_agendados').update({ status: 'concluido', concluido_em: new Date().toISOString() }).eq('id', aviso.id)
     } catch (erro) {
       console.error('processarAvisosAgendados (grupo):', erro)
@@ -107,7 +108,7 @@ export async function processarAvisosAgendados(sock) {
   // Tipos que mandam no privado (todas/online/presencial/selecionadas).
   try {
     const signups = await signupsDoTipo(aviso)
-    const resultado = await enviarParaSignups(sock, aviso.mensagem, signups)
+    const resultado = await enviarParaSignups(sock, aviso, signups)
     await supabase
       .from('whatsapp_avisos_agendados')
       .update({ status: 'concluido', resultado, concluido_em: new Date().toISOString() })

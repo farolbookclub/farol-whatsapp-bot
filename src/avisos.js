@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { conteudoMensagem } from './midia.js'
 
 const INTERVALO_MS = 5000 // 5s entre mensagens, pra não levar ban por flood
 
@@ -12,7 +13,7 @@ function esperar(ms) {
 export async function processarAvisosPendentes(sock) {
   const { data: aviso } = await supabase
     .from('whatsapp_avisos')
-    .select('id, mensagem')
+    .select('id, mensagem, midia_url, midia_mime, midia_nome')
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true })
     .limit(1)
@@ -36,7 +37,7 @@ export async function processarAvisosPendentes(sock) {
       continue
     }
     try {
-      await sock.sendMessage(jid, { text: aviso.mensagem })
+      await sock.sendMessage(jid, conteudoMensagem(aviso))
       enviados++
     } catch (erro) {
       falhas.push({ nome, motivo: erro?.message || 'falha ao enviar' })
