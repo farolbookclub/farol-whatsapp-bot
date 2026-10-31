@@ -21,13 +21,15 @@ export async function membrosFaltando(sock, groupJid) {
 
   const { data: signups } = await supabase.from('signups').select('id, apelido, nome').eq('status', 'aprovado')
   const { data: membros } = await supabase.from('whatsapp_membros').select('jid, signup_id').is('removido_em', null)
+  const { data: membras } = await supabase.from('membras').select('signup_id, nome_exibicao').not('signup_id', 'is', null)
   const jidPorSignup = new Map((membros ?? []).map((m) => [m.signup_id, m.jid]))
+  const exibicaoPorSignup = new Map((membras ?? []).filter((m) => m.nome_exibicao).map((m) => [m.signup_id, m.nome_exibicao]))
 
   const semVinculo = []
   const naoNoGrupo = []
   for (const s of signups ?? []) {
     const jid = jidPorSignup.get(s.id)
-    const nome = s.apelido || s.nome || '—'
+    const nome = exibicaoPorSignup.get(s.id) || s.apelido || s.nome || '—'
     if (!jid) {
       semVinculo.push(nome)
       continue
