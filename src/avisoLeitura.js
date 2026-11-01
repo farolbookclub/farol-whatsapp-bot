@@ -36,19 +36,25 @@ async function resolverMencao(nome) {
   return { texto: exibido, mention: null }
 }
 
+// As emoções não têm risco de spoiler (não revelam enredo), então vão
+// direto na mensagem — só o comentário livre que fica de fora.
+function trechoEmocoes(p) {
+  return p.emocoes && p.emocoes.length ? ` — se sentindo ${p.emocoes.join(', ')}` : ''
+}
+
 async function textoProgresso(p, livro) {
   const quem = await resolverMencao(p.nome)
   const titulo = `"${livro}"`
 
   if (p.tipo === 'abandono') {
-    let texto = `📖 ${quem.texto}\nabandonou ${titulo} 🥀 — parou em: ${trechoProgresso(p)}`
+    let texto = `📖 ${quem.texto}\nabandonou ${titulo} 🥀 — parou em: ${trechoProgresso(p)}${trechoEmocoes(p)}`
     texto += p.comentario ? ` e escreveu um motivo — pode conter spoiler, confira em ${SITE_MEMBRAS}` : ' e não deixou motivo.'
     return { texto, mention: quem.mention }
   }
 
   const pct = porcentagem(p)
   const verbo = pct !== null && pct >= 100 ? 'terminou' : 'atualizou'
-  let texto = `📖 ${quem.texto}\n${verbo} ${titulo}: ${trechoProgresso(p)}`
+  let texto = `📖 ${quem.texto}\n${verbo} ${titulo}: ${trechoProgresso(p)}${trechoEmocoes(p)}`
   texto += p.comentario ? ` e escreveu algo — pode conter spoiler, confira em ${SITE_MEMBRAS}` : ' e não deixou comentários.'
   return { texto, mention: quem.mention }
 }
