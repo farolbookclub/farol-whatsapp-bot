@@ -106,8 +106,9 @@ export async function checarProgressoLeitura(sock) {
 
   for (const registro of novosProgresso ?? []) {
     try {
-      const { data: livro } = await supabase.from('books').select('title').eq('id', registro.book_id).maybeSingle()
-      const { texto, mention } = await textoProgresso(registro, livro?.title || 'o livro')
+      const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
+      if (!livro?.is_current) continue // não é mais a leitura atual — não avisa no grupo
+      const { texto, mention } = await textoProgresso(registro, livro.title)
       for (const g of grupos) {
         await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
       }
@@ -118,8 +119,9 @@ export async function checarProgressoLeitura(sock) {
 
   for (const registro of novasNotas ?? []) {
     try {
-      const { data: livro } = await supabase.from('books').select('title').eq('id', registro.book_id).maybeSingle()
-      const { texto, mention } = await textoNota(registro, livro?.title || 'o livro')
+      const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
+      if (!livro?.is_current) continue // não é mais a leitura atual — não avisa no grupo
+      const { texto, mention } = await textoNota(registro, livro.title)
       for (const g of grupos) {
         await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
       }
