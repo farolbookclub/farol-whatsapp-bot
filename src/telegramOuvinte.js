@@ -2,9 +2,13 @@ import fs from 'node:fs'
 import input from 'input'
 import { TelegramClient } from 'telegram'
 import { StringSession } from 'telegram/sessions/index.js'
-import { NewMessage, EditedMessage } from 'telegram/events/index.js'
+import { NewMessage } from 'telegram/events/index.js'
 import { CustomFile } from 'telegram/client/uploads.js'
 import { supabase } from './supabase.js'
+
+function ehProvisoria(texto) {
+  return /^(transcrevendo|transcribing)\.{3}/i.test(texto)
+}
 
 function comLimiteDeTempo(promessa, ms, mensagemErro) {
   return Promise.race([
@@ -44,9 +48,32 @@ async function repassarMaratonaPraWebhook(texto, botoes) {
   }
 }
 
-// sentMsgId -> { resolve }. Preenchido quando manda um áudio pro bot de
+// sentMsgId -> resolve(texto). Preenchido quando manda um áudio pro bot de
 // transcrição, resolvido quando a resposta (reply) dele chega.
 const aguardandoTranscricao = new Map()
+
+// O bot de transcrição às vezes EDITA a mensagem provisória ("Transcrevendo
+// ...") em vez de mandar uma nova — GramJS não tem um evento pronto de
+// "mensagem editada" nessa versão, então em vez disso fica checando de novo
+// o conteúdo daquela mesma mensagem de tempos em tempos até mudar.
+async function ficarDeOlhoNaEdicao(client, grupo, msgId, idAlvo) {
+  for (let tentativa = 0; tentativa < 40; tentativa++) {
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    if (!aguardandoTranscricao.has(idAlvo)) return // já resolvido por outro caminho
+    try {
+      const mensagens = await client.getMessages(grupo, { ids: [msgId] })
+      const atual = mensagens?.[0]?.message?.trim()
+      if (atual && !ehProvisoria(atual)) {
+        const resolver = aguardandoTranscricao.get(idAlvo)
+        aguardandoTranscricao.delete(idAlvo)
+        resolver(atual.replace(/^texto\s*:\s*/i, ''))
+        return
+      }
+    } catch (erro) {
+      console.error('ficarDeOlhoNaEdicao:', erro)
+    }
+  }
+}
 
 async function atualizarTranscricao(id, dados) {
   const { error } = await supabase.from('transcricoes_pendentes').update(dados).eq('id', id)
@@ -152,11 +179,10 @@ export async function iniciarOuvinteTelegram() {
       const sender = await message.getSender()
       if (!sender?.bot) return
 
-      // Resposta do bot de transcrição a um áudio que a gente mandou. Às
-      // vezes manda 2 mensagens (uma "Transcrevendo..." provisória e depois
-      // a de verdade), às vezes EDITA a mesma mensagem — por isso esse
-      // handler escuta tanto mensagem nova quanto edição. Ignora a
-      // provisória e só resolve quando chegar/aparecer a de verdade.
+      // Resposta do bot de transcrição a um áudio que a gente mandou — manda
+      // uma "Transcrevendo..." provisória e depois a de verdade (como
+      // mensagem nova ou editando a provisória). Ignora a provisória (mas
+      // fica de olho se ela mudar) e só resolve com a de verdade.
       const pareceMaratona = /\s+(atualizou|finalizou|terminou)\s+"/i.test(message.message)
       const respondendoA = message.replyTo?.replyToMsgId
       const idAlvo = respondendoA && aguardandoTranscricao.has(respondendoA)
@@ -167,7 +193,10 @@ export async function iniciarOuvinteTelegram() {
         : (!respondendoA && !pareceMaratona && aguardandoTranscricao.size === 1 ? [...aguardandoTranscricao.keys()][0] : null)
       if (idAlvo) {
         const texto = message.message.trim()
-        if (/^(transcrevendo|transcribing)\.{3}/i.test(texto)) return // provisório, ainda não é a resposta final
+        if (ehProvisoria(texto)) {
+          ficarDeOlhoNaEdicao(client, grupo, message.id, idAlvo)
+          return
+        }
         const resolver = aguardandoTranscricao.get(idAlvo)
         aguardandoTranscricao.delete(idAlvo)
         resolver(texto.replace(/^texto\s*:\s*/i, ''))
@@ -185,7 +214,6 @@ export async function iniciarOuvinteTelegram() {
   }
 
   client.addEventHandler(processarMensagem, new NewMessage({}))
-  client.addEventHandler(processarMensagem, new EditedMessage({}))
 
   // Realtime: novo pedido de transcrição -> entra na fila.
   supabase
