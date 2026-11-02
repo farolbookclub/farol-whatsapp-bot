@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js'
-import { normalizarNumero } from './vinculo.js'
+import { normalizarNumero, marcarEntrouMembras } from './vinculo.js'
 import { iniciarGuia } from './guia.js'
 
 function esperar(ms) {
@@ -38,6 +38,7 @@ export async function autoVincularTodas(sock) {
         await supabase
           .from('whatsapp_membros')
           .upsert({ jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, ja_nos_grupos: true }, { onConflict: 'jid' })
+        await marcarEntrouMembras(c.id)
         try {
           await iniciarGuia(sock, jid, c.apelido || c.nome, true)
         } catch (erro) {

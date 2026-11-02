@@ -2,6 +2,19 @@ import { supabase } from './supabase.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// membras.entrou_em é o que o painel admin usa pra mostrar "entrou no
+// grupo" em Integrantes — é separado de whatsapp_membros.entrou_em (que só
+// controla a regra de inatividade). Sem isso, a integrante aparece pra
+// sempre como "ainda não entrou no grupo" mesmo já estando lá.
+export async function marcarEntrouMembras(signupId) {
+  const { error } = await supabase
+    .from('membras')
+    .update({ entrou_em: new Date().toISOString().slice(0, 10) })
+    .eq('signup_id', signupId)
+    .is('entrou_em', null)
+  if (error) console.error('marcarEntrouMembras:', error.message)
+}
+
 // Liga o número de WhatsApp (jid) a uma inscrição aprovada, a partir do mesmo
 // token usado no link "Minha inscrição" (manda "/start <token>" no privado).
 // Link de uso único por inscrição: se já tiver outro jid vinculado, recusa.
@@ -33,6 +46,7 @@ export async function vincularConta(jid, token) {
     .from('whatsapp_membros')
     .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1 }, { onConflict: 'jid' })
   if (error) throw error
+  await marcarEntrouMembras(cadastro.id)
 
   return { ok: true, apelido: cadastro.apelido || cadastro.nome, formato: cadastro.formato }
 }
@@ -72,6 +86,7 @@ export async function vincularPorNumero(sock, jid) {
         await supabase
           .from('whatsapp_membros')
           .upsert({ jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, ja_nos_grupos: true }, { onConflict: 'jid' })
+        await marcarEntrouMembras(c.id)
         return c
       }
     } catch (erro) {
