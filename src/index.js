@@ -8,6 +8,8 @@ import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, d
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { iniciarEscutaLeitura } from './avisoLeitura.js'
+import { processarAudioGrupo, iniciarEscutaTranscricoes } from './transcricao.js'
+import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
 import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
@@ -228,6 +230,11 @@ async function handleGroupMessage(sock, m, groupJid) {
     return
   }
 
+  if (m.message?.audioMessage) {
+    await processarAudioGrupo(m, groupJid, topico)
+    return
+  }
+
   await guardarMensagem({
     groupJid,
     topico,
@@ -387,6 +394,8 @@ async function connectToWhatsApp() {
       if (!escutaLeituraIniciada) {
         escutaLeituraIniciada = true
         iniciarEscutaLeitura(() => sockAtual)
+        iniciarEscutaTranscricoes(() => sockAtual)
+        iniciarOuvinteTelegram().catch((erro) => console.error('ouvinte do Telegram:', erro))
       }
       try {
         await processarPendentes(sock)
