@@ -295,7 +295,7 @@ export async function perguntarIA(jid, pergunta) {
   if (erroUso) throw erroUso
   if (feitas > config.ia_limite_diario) {
     if (feitas === config.ia_limite_diario + 1) {
-      return 'Por hoje já respondi bastante pra você 💕 Amanhã tem mais! Se for urgente, chama a Administração.'
+      return 'Por hoje já respondi bastante pra você 💕 Amanhã tem mais! Se for urgente, pode perguntar no grupo de Bate-papo 💖'
     }
     return null
   }
@@ -329,7 +329,7 @@ export async function perguntarIA(jid, pergunta) {
   const resposta = String(json?.choices?.[0]?.message?.content || '').trim()
   if (!r.ok || !resposta) {
     console.error('Groq:', r.status, JSON.stringify(json?.error ?? json))
-    return 'Tive um probleminha pra responder agora 😕 Tenta de novo daqui a pouco ou chama a Administração.'
+    return 'Tive um probleminha pra responder agora 😕 Tenta de novo daqui a pouco ou pergunta no grupo de Bate-papo 💖'
   }
   guardarTroca(jid, pergunta, resposta)
   return resposta
