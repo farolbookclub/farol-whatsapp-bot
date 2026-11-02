@@ -25,25 +25,24 @@ function trechoProgresso(p) {
 }
 
 // Nome escolhido no site -> membras.signup_id -> conta do WhatsApp vinculada.
-// Vinculada: "Nome (@numero)" (o @ notifica). Senão, só o nome.
+// Vinculada: "*Nome* (@numero)" (o @ notifica). Senão, só o nome em negrito.
 async function resolverMencao(nome) {
   const exibido = nomeVis(nome)
   const { data: m } = await supabase.from('membras').select('signup_id').eq('nome', nome).not('signup_id', 'is', null).limit(1).maybeSingle()
   if (m?.signup_id) {
     const { data: w } = await supabase.from('whatsapp_membros').select('jid').eq('signup_id', m.signup_id).is('removido_em', null).maybeSingle()
-    if (w) return { texto: `${exibido} (@${w.jid.replace(/\D/g, '')})`, mention: w.jid }
+    if (w) return { texto: `*${exibido}* (@${w.jid.replace(/\D/g, '')})`, mention: w.jid }
   }
-  return { texto: exibido, mention: null }
+  return { texto: `*${exibido}*`, mention: null }
 }
 
 async function textoProgresso(p, livro) {
   const quem = await resolverMencao(p.nome)
-  const titulo = `"${livro}"`
   const abandono = p.tipo === 'abandono'
   const pct = porcentagem(p)
   const verbo = abandono ? 'abandonou' : pct !== null && pct >= 100 ? 'terminou' : 'atualizou'
 
-  let texto = `📖 ${quem.texto} ${verbo} ${titulo}${abandono ? ' 🥀' : ''}\n\n`
+  let texto = `${quem.texto} ${verbo} *"${livro}"*\n\n`
   texto += `* *${abandono ? 'Parou em' : 'Progresso'}:* ${trechoProgresso(p)}\n`
   if (p.emocoes?.length) texto += `* *Emoções:* ${p.emocoes.join(', ')}\n`
   if (p.comentario) texto += `* *Comentário*: Confira em ${SITE_MEMBRAS}, pode conter spoiler.\n`
