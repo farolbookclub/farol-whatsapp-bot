@@ -20,8 +20,16 @@ function semMarcador(texto) {
   return !MARCADOR_PARTE.test(texto)
 }
 
+// Além do "[n/total]" no fim, o texto final pode ter um "[continua]:" no
+// meio (onde o serviço de transcrição colou os pedaços internos) — tira os
+// dois e limpa espaço/linha sobrando.
 function tirarMarcador(texto) {
-  return texto.replace(MARCADOR_PARTE, '').trim()
+  return texto
+    .replace(MARCADOR_PARTE, '')
+    .replace(/\[continua(ção)?\]\s*:?/gi, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function comLimiteDeTempo(promessa, ms, mensagemErro) {
