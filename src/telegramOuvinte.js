@@ -84,7 +84,9 @@ async function aguardarTranscricao(client, grupo, msgId) {
     try {
       const mensagens = await client.getMessages(grupo, { minId: msgId, limit: 10 })
       const respostas = mensagens
-        .filter((m) => m.id > msgId && (m.message || '').trim())
+        // Ignora qualquer coisa que pareça atualização do Maratona, caso
+        // uma caia bem no meio da espera da transcrição.
+        .filter((m) => m.id > msgId && (m.message || '').trim() && !/\s+(atualizou|finalizou|terminou)\s+"/i.test(m.message))
         .sort((a, b) => a.id - b.id)
       if (!respostas.length) continue
 
