@@ -8,7 +8,7 @@ import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, d
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { iniciarEscutaLeitura } from './avisoLeitura.js'
-import { processarAudioGrupo, iniciarEscutaTranscricoes } from './transcricao.js'
+import { processarAudioGrupo, processarComandoTranscreve, iniciarEscutaTranscricoes } from './transcricao.js'
 import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
@@ -232,6 +232,20 @@ async function handleGroupMessage(sock, m, groupJid) {
 
   if (m.message?.audioMessage) {
     await processarAudioGrupo(m, groupJid, topico)
+    return
+  }
+
+  // "/transcreve" respondendo um áudio (de qualquer hora) pede a
+  // transcrição manual daquele áudio específico.
+  if (/^\/transcreve\b/i.test(texto)) {
+    const pedido = await processarComandoTranscreve(m, groupJid, topico)
+    if (pedido) {
+      try {
+        await sock.sendMessage(groupJid, { text: '🎧 Pedido, já volto com a transcrição.' }, { quoted: m })
+      } catch (erro) {
+        console.error('confirmar /transcreve:', erro)
+      }
+    }
     return
   }
 
