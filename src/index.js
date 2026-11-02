@@ -257,6 +257,10 @@ async function handleDM(sock, m, jid) {
     return
   }
 
+  // Parece comando (começa com "/") mas não é nenhum reconhecido: ignora,
+  // não manda pra IA (ex.: /resumo, que não existe mais).
+  if (/^\//.test(texto)) return
+
   // Mensagem livre de quem já é integrante: trata como pergunta pra IA.
   if (texto) {
     try {
