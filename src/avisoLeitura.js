@@ -36,34 +36,20 @@ async function resolverMencao(nome) {
   return { texto: exibido, mention: null }
 }
 
-// As emoções não têm risco de spoiler (não revelam enredo), então vão
-// direto na mensagem — só o comentário livre que fica de fora.
-function trechoEmocoes(p) {
-  return p.emocoes && p.emocoes.length ? ` — se sentindo ${p.emocoes.join(', ')}` : ''
-}
-
-// Fonte vai no fim, depois de tudo (não é spoiler, só dizendo de onde veio).
-function trechoFonte(p) {
-  return p.fonte === 'maratona' ? ' (Fonte: MaratonaApp)' : ''
-}
-
 async function textoProgresso(p, livro) {
   const quem = await resolverMencao(p.nome)
   const titulo = `"${livro}"`
-
-  if (p.tipo === 'abandono') {
-    let texto = `📖 ${quem.texto}\nabandonou ${titulo} 🥀 — parou em: ${trechoProgresso(p)}${trechoEmocoes(p)}`
-    texto += p.comentario ? ` e escreveu um motivo — pode conter spoiler, confira em ${SITE_MEMBRAS}` : ' e não deixou motivo.'
-    texto += trechoFonte(p)
-    return { texto, mention: quem.mention }
-  }
-
+  const abandono = p.tipo === 'abandono'
   const pct = porcentagem(p)
-  const verbo = pct !== null && pct >= 100 ? 'terminou' : 'atualizou'
-  let texto = `📖 ${quem.texto}\n${verbo} ${titulo}: ${trechoProgresso(p)}${trechoEmocoes(p)}`
-  texto += p.comentario ? ` e escreveu algo — pode conter spoiler, confira em ${SITE_MEMBRAS}` : ' e não deixou comentários.'
-  texto += trechoFonte(p)
-  return { texto, mention: quem.mention }
+  const verbo = abandono ? 'abandonou' : pct !== null && pct >= 100 ? 'terminou' : 'atualizou'
+
+  let texto = `📖 ${quem.texto} ${verbo} ${titulo}${abandono ? ' 🥀' : ''}\n\n`
+  texto += `* *${abandono ? 'Parou em' : 'Progresso'}:* ${trechoProgresso(p)}\n`
+  if (p.emocoes?.length) texto += `* *Emoções:* ${p.emocoes.join(', ')}\n`
+  if (p.comentario) texto += `* *Comentário*: Confira em ${SITE_MEMBRAS}, pode conter spoiler.\n`
+  if (p.fonte === 'maratona') texto += `* *Fonte:* MaratonaApp\n`
+
+  return { texto: texto.trim(), mention: quem.mention }
 }
 
 // Notas (public_ratings) não têm comentário livre, só nota e favorito — sem
