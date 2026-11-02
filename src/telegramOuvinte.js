@@ -10,6 +10,20 @@ function ehProvisoria(texto) {
   return /^(transcrevendo|transcribing)\.{3}/i.test(texto)
 }
 
+const MARCADOR_PARTE = /\[\d+\s*\/\s*\d+\]\s*$/
+
+// O bot termina as mensagens com "[2/6]" (números variam) enquanto ainda
+// não acabou — seja numa mensagem só ou em várias (texto longo dividido).
+// O sinal de "terminou de vez" é sempre o mesmo, independente de ter vindo
+// 1 ou mais mensagens: a ÚLTIMA delas não ter esse marcador no final.
+function semMarcador(texto) {
+  return !MARCADOR_PARTE.test(texto)
+}
+
+function tirarMarcador(texto) {
+  return texto.replace(MARCADOR_PARTE, '').trim()
+}
+
 function comLimiteDeTempo(promessa, ms, mensagemErro) {
   return Promise.race([
     promessa,
@@ -48,31 +62,39 @@ async function repassarMaratonaPraWebhook(texto, botoes) {
   }
 }
 
-// sentMsgId -> resolve(texto). Preenchido quando manda um áudio pro bot de
-// transcrição, resolvido quando a resposta (reply) dele chega.
-const aguardandoTranscricao = new Map()
+const INTERVALO_CONFERENCIA_MS = 5000
 
-// O bot de transcrição às vezes EDITA a mensagem provisória ("Transcrevendo
-// ...") em vez de mandar uma nova — GramJS não tem um evento pronto de
-// "mensagem editada" nessa versão, então em vez disso fica checando de novo
-// o conteúdo daquela mesma mensagem de tempos em tempos até mudar.
-async function ficarDeOlhoNaEdicao(client, grupo, msgId, idAlvo) {
-  for (let tentativa = 0; tentativa < 40; tentativa++) {
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    if (!aguardandoTranscricao.has(idAlvo)) return // já resolvido por outro caminho
+// Fica conferindo (a cada 5s, só enquanto esse áudio estiver pendente — não
+// pra sempre) as mensagens que vieram depois da que a gente mandou, até
+// achar uma resposta pronta de verdade. Cobre os três casos: resposta numa
+// mensagem só, resposta em pedaços tipo "[2/6]" (espera o número bater com
+// o total) e resposta longa dividida em mais de uma mensagem (junta todas).
+async function aguardarTranscricao(client, grupo, msgId) {
+  const tentativasMax = Math.ceil(TIMEOUT_TRANSCRICAO_MS / INTERVALO_CONFERENCIA_MS)
+  for (let tentativa = 0; tentativa < tentativasMax; tentativa++) {
+    await new Promise((resolve) => setTimeout(resolve, INTERVALO_CONFERENCIA_MS))
     try {
-      const mensagens = await client.getMessages(grupo, { ids: [msgId] })
-      const atual = mensagens?.[0]?.message?.trim()
-      if (atual && !ehProvisoria(atual)) {
-        const resolver = aguardandoTranscricao.get(idAlvo)
-        aguardandoTranscricao.delete(idAlvo)
-        resolver(atual.replace(/^texto\s*:\s*/i, ''))
-        return
-      }
+      const mensagens = await client.getMessages(grupo, { minId: msgId, limit: 10 })
+      const respostas = mensagens
+        .filter((m) => m.id > msgId && (m.message || '').trim())
+        .sort((a, b) => a.id - b.id)
+      if (!respostas.length) continue
+
+      const ultima = respostas[respostas.length - 1].message.trim()
+      if (ehProvisoria(ultima) || !semMarcador(ultima)) continue // ainda não terminou (sozinha ou em partes)
+
+      const textoFinal = respostas
+        .map((m) => m.message.trim())
+        .filter((t) => !ehProvisoria(t))
+        .map(tirarMarcador)
+        .join('\n')
+
+      return textoFinal.replace(/^texto\s*:\s*/i, '')
     } catch (erro) {
-      console.error('ficarDeOlhoNaEdicao:', erro)
+      console.error('aguardarTranscricao:', erro)
     }
   }
+  return null
 }
 
 async function atualizarTranscricao(id, dados) {
@@ -94,16 +116,7 @@ async function processarAudioPendente(client, grupo, row) {
       'demorou demais pra mandar o áudio pro Telegram',
     )
 
-    const transcricao = await new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        aguardandoTranscricao.delete(enviado.id)
-        resolve(null)
-      }, TIMEOUT_TRANSCRICAO_MS)
-      aguardandoTranscricao.set(enviado.id, (texto) => {
-        clearTimeout(timer)
-        resolve(texto)
-      })
-    })
+    const transcricao = await aguardarTranscricao(client, grupo, enviado.id)
 
     if (transcricao) {
       await atualizarTranscricao(row.id, { status: 'concluido', transcricao, concluido_em: new Date().toISOString() })
@@ -179,31 +192,9 @@ export async function iniciarOuvinteTelegram() {
       const sender = await message.getSender()
       if (!sender?.bot) return
 
-      // Resposta do bot de transcrição a um áudio que a gente mandou — manda
-      // uma "Transcrevendo..." provisória e depois a de verdade (como
-      // mensagem nova ou editando a provisória). Ignora a provisória (mas
-      // fica de olho se ela mudar) e só resolve com a de verdade.
-      const pareceMaratona = /\s+(atualizou|finalizou|terminou)\s+"/i.test(message.message)
-      const respondendoA = message.replyTo?.replyToMsgId
-      const idAlvo = respondendoA && aguardandoTranscricao.has(respondendoA)
-        ? respondendoA
-        // Às vezes o bot manda sem marcar como resposta de verdade — se só
-        // tem 1 áudio esperando resposta (e não parece ser do Maratona),
-        // assume que é desse mesmo.
-        : (!respondendoA && !pareceMaratona && aguardandoTranscricao.size === 1 ? [...aguardandoTranscricao.keys()][0] : null)
-      if (idAlvo) {
-        const texto = message.message.trim()
-        if (ehProvisoria(texto)) {
-          ficarDeOlhoNaEdicao(client, grupo, message.id, idAlvo)
-          return
-        }
-        const resolver = aguardandoTranscricao.get(idAlvo)
-        aguardandoTranscricao.delete(idAlvo)
-        resolver(texto.replace(/^texto\s*:\s*/i, ''))
-        return
-      }
-
-      // Caso contrário, trata como possível atualização do MaratonaApp.
+      // A transcrição de áudio não passa por aqui — quem cuida dela é o
+      // polling em aguardarTranscricao (mais confiável que depender de
+      // evento). Aqui só sobra tratar como possível atualização do Maratona.
       const botoes = (message.replyMarkup?.rows ?? []).flatMap((linha) =>
         (linha.buttons ?? []).map((b) => ({ text: b.text, url: b.url || null })),
       )
