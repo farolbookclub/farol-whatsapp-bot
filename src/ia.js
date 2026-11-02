@@ -312,10 +312,11 @@ export async function perguntarIA(jid, pergunta) {
     ],
   })
 
-  // Tenta 1x e, se falhar (ex.: rate limit da Groq em chamadas seguidas),
-  // tenta de novo depois de 1s antes de desistir.
+  // Tenta algumas vezes (ex.: rate limit da Groq em perguntas seguidas) antes
+  // de desistir, com espera maior a cada tentativa.
+  const ESPERAS_MS = [1000, 2500, 4000]
   let r, json
-  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+  for (let tentativa = 1; tentativa <= ESPERAS_MS.length + 1; tentativa++) {
     r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
@@ -323,12 +324,12 @@ export async function perguntarIA(jid, pergunta) {
     })
     json = await r.json().catch(() => null)
     if (r.ok && json?.choices?.[0]?.message?.content) break
-    if (tentativa === 1) await new Promise((resolve) => setTimeout(resolve, 1000))
+    console.error(`Groq (tentativa ${tentativa}):`, r.status, JSON.stringify(json?.error ?? json))
+    if (tentativa <= ESPERAS_MS.length) await new Promise((resolve) => setTimeout(resolve, ESPERAS_MS[tentativa - 1]))
   }
 
   const resposta = String(json?.choices?.[0]?.message?.content || '').trim()
   if (!r.ok || !resposta) {
-    console.error('Groq:', r.status, JSON.stringify(json?.error ?? json))
     return 'Tive um probleminha pra responder agora 😕 Tenta de novo daqui a pouco ou pergunta no grupo de Bate-papo 💖'
   }
   guardarTroca(jid, pergunta, resposta)
