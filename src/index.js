@@ -7,7 +7,7 @@ import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
-import { checarProgressoLeitura } from './avisoLeitura.js'
+import { iniciarEscutaLeitura } from './avisoLeitura.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
 import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
@@ -27,6 +27,7 @@ const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💖 Pra entrar na comu
 
 // Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
 let sockAtual = null
+let escutaLeituraIniciada = false
 
 function textoDaMensagem(m) {
   const msg = m.message
@@ -371,6 +372,10 @@ async function connectToWhatsApp() {
       console.log('Conectado ao WhatsApp! 💖')
       console.log('[eu]', JSON.stringify(sock.user))
       sockAtual = sock
+      if (!escutaLeituraIniciada) {
+        escutaLeituraIniciada = true
+        iniciarEscutaLeitura(() => sockAtual)
+      }
       try {
         await processarPendentes(sock)
       } catch (erro) {
@@ -504,13 +509,6 @@ connectToWhatsApp()
 
 // Limpeza de retenção, uma vez por dia.
 setInterval(() => limparMensagensAntigas().catch((e) => console.error('limpar mensagens:', e)), 24 * 60 * 60 * 1000)
-
-// Progresso de leitura do site: checa a cada 2 minutos.
-// (Frequências abaixo reduzidas pra economizar Disk IO do Supabase — não
-// precisa ser em tempo real, ninguém reclama de meio minuto a mais.)
-setInterval(() => {
-  if (sockAtual) checarProgressoLeitura(sockAtual).catch((e) => console.error('checar progresso leitura:', e))
-}, 2 * 60 * 1000)
 
 // Avisos pendentes do painel admin ("avisar todas"): checa a cada 1 min. O
 // próprio processarAvisosPendentes já espera 5s entre cada mensagem.

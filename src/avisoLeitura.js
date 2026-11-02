@@ -61,64 +61,58 @@ async function textoNota(r, livro) {
   return { texto, mention: quem.mention }
 }
 
-// Checa progresso_leitura e public_ratings (avaliações) novos desde a última
-// vez e posta no grupo Leitura do mês. Progresso não revela comentário (link
-// pro site em vez de citar o texto); nota não tem comentário, então vai tudo.
-export async function checarProgressoLeitura(sock) {
-  const { data: estado, error: erroEstado } = await supabase.from('whatsapp_leitura_checagem').select('ultima_em').eq('id', 1).maybeSingle()
-  // Se a consulta falhar (ex.: banco instável), não dá pra saber "desde
-  // quando" com segurança — melhor pular esta rodada do que arriscar tratar
-  // tudo como novo e disparar o histórico inteiro de uma vez.
-  if (erroEstado) {
-    console.error('checarProgressoLeitura (estado):', erroEstado.message)
-    return
-  }
-  // Nunca viu antes (primeira vez): começa a contar de agora, não do início
-  // dos tempos — senão despeja todo o histórico já existente.
-  const desde = estado?.ultima_em || new Date().toISOString()
-  const agora = new Date().toISOString()
+async function gruposLeitura() {
+  const { data } = await supabase.from('whatsapp_grupos').select('group_jid').eq('topico', 'leitura').eq('ativo', true)
+  return data ?? []
+}
 
-  const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid').eq('topico', 'leitura').eq('ativo', true)
-  const { data: novosProgresso, error: erroProgresso } = await supabase
-    .from('progresso_leitura')
-    .select('*')
-    .gt('created_at', desde)
-    .order('created_at', { ascending: true })
-  const { data: novasNotas, error: erroNotas } = await supabase
-    .from('public_ratings')
-    .select('*')
-    .gt('created_at', desde)
-    .order('created_at', { ascending: true })
-
-  await supabase.from('whatsapp_leitura_checagem').upsert({ id: 1, ultima_em: agora })
-
-  if (erroProgresso) console.error('checarProgressoLeitura (progresso):', erroProgresso.message)
-  if (erroNotas) console.error('checarProgressoLeitura (notas):', erroNotas.message)
-  if (!grupos?.length) return
-
-  for (const registro of novosProgresso ?? []) {
-    try {
-      const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
-      if (!livro?.is_current) continue // não é mais a leitura atual — não avisa no grupo
-      const { texto, mention } = await textoProgresso(registro, livro.title)
-      for (const g of grupos) {
-        await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
-      }
-    } catch (erro) {
-      console.error('postar progresso:', erro)
+async function postarProgresso(sock, registro) {
+  try {
+    const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
+    if (!livro?.is_current) return // não é mais a leitura atual — não avisa no grupo
+    const { texto, mention } = await textoProgresso(registro, livro.title)
+    for (const g of await gruposLeitura()) {
+      await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
     }
+  } catch (erro) {
+    console.error('postar progresso:', erro)
   }
+}
 
-  for (const registro of novasNotas ?? []) {
-    try {
-      const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
-      if (!livro?.is_current) continue // não é mais a leitura atual — não avisa no grupo
-      const { texto, mention } = await textoNota(registro, livro.title)
-      for (const g of grupos) {
-        await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
-      }
-    } catch (erro) {
-      console.error('postar nota:', erro)
+async function postarNota(sock, registro) {
+  try {
+    const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
+    if (!livro?.is_current) return // não é mais a leitura atual — não avisa no grupo
+    const { texto, mention } = await textoNota(registro, livro.title)
+    for (const g of await gruposLeitura()) {
+      await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
     }
+  } catch (erro) {
+    console.error('postar nota:', erro)
   }
+}
+
+// Em vez de ficar checando a tabela de tempos em tempos, usa o Realtime do
+// Supabase: o banco avisa a gente na hora que uma linha nova entra em
+// progresso_leitura/public_ratings — sem polling nenhum, sem gastar Disk IO
+// à toa, e o aviso no WhatsApp sai instantâneo (seja de quem atualizou pelo
+// site, seja do Maratona via Telegram).
+// Recebe uma função que devolve o socket atual (não o socket fixo), porque
+// se o WhatsApp reconectar o socket troca, mas a inscrição do Realtime
+// continua a mesma — só precisa chamar isso 1x, não a cada reconexão.
+export function iniciarEscutaLeitura(getSock) {
+  supabase
+    .channel('leitura-realtime')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'progresso_leitura' }, (payload) => {
+      const sock = getSock()
+      if (sock) postarProgresso(sock, payload.new)
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'public_ratings' }, (payload) => {
+      const sock = getSock()
+      if (sock) postarNota(sock, payload.new)
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') console.log('Escutando progresso de leitura em tempo real.')
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('Realtime (leitura) caiu:', status)
+    })
 }
