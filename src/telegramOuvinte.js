@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import input from 'input'
 import { TelegramClient } from 'telegram'
 import { StringSession } from 'telegram/sessions/index.js'
-import { NewMessage } from 'telegram/events/index.js'
+import { NewMessage, EditedMessage } from 'telegram/events/index.js'
 import { CustomFile } from 'telegram/client/uploads.js'
 import { supabase } from './supabase.js'
 
@@ -141,7 +141,7 @@ export async function iniciarOuvinteTelegram() {
   }
   const grupo = dialogoGrupo.entity
 
-  client.addEventHandler(async (event) => {
+  async function processarMensagem(event) {
     try {
       const message = event.message
       if (!message?.message) return
@@ -152,16 +152,24 @@ export async function iniciarOuvinteTelegram() {
       const sender = await message.getSender()
       if (!sender?.bot) return
 
-      // Resposta do bot de transcrição a um áudio que a gente mandou. Ele
-      // manda 2 mensagens: primeiro um "Transcrevendo..." provisório, depois
-      // o texto de verdade (com "Texto:" na frente) — ignora a provisória e
-      // só resolve quando chegar a de verdade.
+      // Resposta do bot de transcrição a um áudio que a gente mandou. Às
+      // vezes manda 2 mensagens (uma "Transcrevendo..." provisória e depois
+      // a de verdade), às vezes EDITA a mesma mensagem — por isso esse
+      // handler escuta tanto mensagem nova quanto edição. Ignora a
+      // provisória e só resolve quando chegar/aparecer a de verdade.
+      const pareceMaratona = /\s+(atualizou|finalizou|terminou)\s+"/i.test(message.message)
       const respondendoA = message.replyTo?.replyToMsgId
-      if (respondendoA && aguardandoTranscricao.has(respondendoA)) {
+      const idAlvo = respondendoA && aguardandoTranscricao.has(respondendoA)
+        ? respondendoA
+        // Às vezes o bot manda sem marcar como resposta de verdade — se só
+        // tem 1 áudio esperando resposta (e não parece ser do Maratona),
+        // assume que é desse mesmo.
+        : (!respondendoA && !pareceMaratona && aguardandoTranscricao.size === 1 ? [...aguardandoTranscricao.keys()][0] : null)
+      if (idAlvo) {
         const texto = message.message.trim()
-        if (/^transcrevendo/i.test(texto)) return // provisório, ainda não é a resposta final
-        const resolver = aguardandoTranscricao.get(respondendoA)
-        aguardandoTranscricao.delete(respondendoA)
+        if (/^(transcrevendo|transcribing)\.{3}/i.test(texto)) return // provisório, ainda não é a resposta final
+        const resolver = aguardandoTranscricao.get(idAlvo)
+        aguardandoTranscricao.delete(idAlvo)
         resolver(texto.replace(/^texto\s*:\s*/i, ''))
         return
       }
@@ -174,7 +182,10 @@ export async function iniciarOuvinteTelegram() {
     } catch (erro) {
       console.error('telegramOuvinte (processar mensagem):', erro)
     }
-  }, new NewMessage({}))
+  }
+
+  client.addEventHandler(processarMensagem, new NewMessage({}))
+  client.addEventHandler(processarMensagem, new EditedMessage({}))
 
   // Realtime: novo pedido de transcrição -> entra na fila.
   supabase
