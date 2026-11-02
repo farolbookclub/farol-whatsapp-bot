@@ -13,7 +13,5 @@ export const GROQ_API_KEY = exigir('GROQ_API_KEY')
 // em vez de QR (útil quando o WhatsApp tá no mesmo aparelho que roda o bot).
 // Só números, com DDI+DDD, sem +, espaço ou traço (ex: 5511999999999).
 export const WHATSAPP_PHONE_NUMBER = process.env.WHATSAPP_PHONE_NUMBER || null
-// Segredo do biofarol (WHATSAPP_CODIGO_SECRET) — só precisa pro !novocodigo funcionar.
-export const CODIGO_SECRET = process.env.CODIGO_SECRET || null
 // Segredo do biofarol (WHATSAPP_PUSH_SECRET) — só precisa pro push de "entrou/saiu" pra Kah.
 export const PUSH_SECRET = process.env.PUSH_SECRET || null

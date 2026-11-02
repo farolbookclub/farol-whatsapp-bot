@@ -1,7 +1,7 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys'
 import pino from 'pino'
 import qrcodeTerminal from 'qrcode-terminal'
-import { grupoAtivo, identificarTopico, configurarGrupo, TOPICOS } from './grupos.js'
+import { grupoAtivo, identificarTopico, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
 import { supabase } from './supabase.js'
@@ -14,10 +14,10 @@ import { processarAvisosAgendados } from './avisosAgendados.js'
 import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia } from './guia.js'
 import { perguntarIA } from './ia.js'
-import { membrosFaltando, processarChecagensPendentes } from './faltando.js'
+import { processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
-import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
+import { checarCodigoPendente } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
 
@@ -126,37 +126,6 @@ async function handleGroupMessage(sock, m, groupJid) {
   const texto = textoDaMensagem(m).trim()
   const participant = m.key.participant
   if (!participant) return
-
-  const comandoConfigurar = texto.match(/^!configurar\s+(bate_papo|leitura|avisos|presencial)$/i)
-  if (comandoConfigurar) {
-    const meta = await sock.groupMetadata(groupJid)
-    const admin = meta.participants.find((p) => p.id === participant)?.admin
-    if (!admin) return
-    const resposta = await configurarGrupo(groupJid, meta.subject, comandoConfigurar[1].toLowerCase())
-    await sock.sendMessage(groupJid, { text: resposta })
-    return
-  }
-
-  if (/^!faltando$/i.test(texto)) {
-    const meta = await sock.groupMetadata(groupJid)
-    const admin = meta.participants.find((p) => p.id === participant)?.admin
-    if (!admin) return
-    const { nomeGrupo, semVinculo, naoNoGrupo } = await membrosFaltando(sock, groupJid)
-    let texto2 = `Checagem do grupo "${nomeGrupo}":\n\n`
-    texto2 += naoNoGrupo.length ? `Aprovadas e vinculadas, mas não estão aqui (${naoNoGrupo.length}):\n${naoNoGrupo.join(', ')}` : 'Todas as vinculadas já estão aqui 💖'
-    if (semVinculo.length) texto2 += `\n\nAprovadas mas ainda sem WhatsApp vinculado (${semVinculo.length}):\n${semVinculo.join(', ')}`
-    await sock.sendMessage(groupJid, { text: texto2 })
-    return
-  }
-
-  if (/^!novocodigo$/i.test(texto)) {
-    const meta = await sock.groupMetadata(groupJid)
-    const admin = meta.participants.find((p) => p.id === participant)?.admin
-    if (!admin) return
-    const erro = await pedirNovoCodigo()
-    await sock.sendMessage(groupJid, { text: erro ? `Não consegui trocar o código: ${erro}` : 'Trocando o código... já posto aqui em instantes 🔑' })
-    return
-  }
 
   if (!(await grupoAtivo(groupJid))) return
   const topico = await identificarTopico(groupJid)
