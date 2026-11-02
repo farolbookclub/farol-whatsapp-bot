@@ -3,7 +3,6 @@ import pino from 'pino'
 import qrcodeTerminal from 'qrcode-terminal'
 import { grupoAtivo, identificarTopico, configurarGrupo, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
-import { gerarEEnviarResumo, responderFollowUpResumo } from './resumo.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
@@ -22,8 +21,7 @@ import { checarCodigoPendente, pedirNovoCodigo } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
 
-const AJUDA_COMANDOS =
-  '/resumo — te envio um breve resumo do Bate-papo\n/resumo_leitura — te envio um breve resumo da Leitura do mês (sem spoilers)\n/resumo_avisos — te envio um breve resumo dos Avisos\n/duvida + sua pergunta — tento te ajudar 💖'
+const AJUDA_COMANDOS = '/duvida + sua pergunta — tento te ajudar 💖'
 
 const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💖 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
 
@@ -92,22 +90,6 @@ async function processarPendentes(sock) {
       console.error(`pendentes ${g.group_jid}:`, erro)
     }
   }
-}
-
-// Flexível: com ou sem barra, com ou sem _/-/espaço antes do tópico — "/resumo",
-// "resumo", "/resumo_leitura", "resumo leitura", "resumoleitura" etc.
-function comandoResumoMatch(texto) {
-  const t = String(texto || '').trim()
-  return t.match(/^\/?resumo[\s_-]*(leitura|avisos|presencial)?$/i)
-}
-
-async function comandoResumo(sock, jid, topicoForcado) {
-  const inscricao = await inscricaoDoJid(jid)
-  if (!inscricao) {
-    await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💖' })
-    return
-  }
-  await gerarEEnviarResumo(sock, jid, topicoForcado || 'bate_papo')
 }
 
 // O WhatsApp às vezes menciona/identifica o próprio bot pelo número normal,
@@ -289,24 +271,6 @@ async function handleDM(sock, m, jid) {
       console.error('IA (/duvida):', erro)
     }
     return
-  }
-
-  const comandoResumoPv = comandoResumoMatch(texto)
-  if (comandoResumoPv) {
-    await comandoResumo(sock, jid, comandoResumoPv[1]?.toLowerCase() || null)
-    return
-  }
-
-  if (texto && !texto.startsWith('/')) {
-    const { data: contexto } = await supabase
-      .from('whatsapp_resumo_contexto')
-      .select('topico, mensagens, criado_em')
-      .eq('jid', jid)
-      .maybeSingle()
-    if (contexto && Date.now() - new Date(contexto.criado_em).getTime() < 15 * 60 * 1000) {
-      await responderFollowUpResumo(sock, jid, contexto.topico, contexto.mensagens, texto)
-      return
-    }
   }
 
   const inscricao = await inscricaoDoJid(jid)
