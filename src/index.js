@@ -101,12 +101,6 @@ function comandoResumoMatch(texto) {
   return t.match(/^\/?resumo[\s_-]*(leitura|avisos|presencial)?$/i)
 }
 
-// "resume o/esse grupo" — jeito natural de pedir o resumo do grupo atual
-// (mesma coisa que "/resumo" sem tópico, só reconhece em grupo).
-function comandoResumoNaturalMatch(texto) {
-  return String(texto || '').trim().match(/^resume\s+(o|esse|este)\s+grupo$/i)
-}
-
 async function comandoResumo(sock, jid, topicoForcado) {
   const inscricao = await inscricaoDoJid(jid)
   if (!inscricao) {
@@ -146,34 +140,6 @@ async function estaEmAlgumGrupoAtivo(sock, jid) {
   return false
 }
 
-// Só responde em grupo quando mencionam o bot de verdade — não reage mais
-// a quem só responde (quoted) alguma mensagem dele (tipo a transcrição),
-// isso evita o bot "entrar na conversa" sem ser chamado. Fora isso, só
-// comandos explícitos (/duvida, /resumo, /transcreve) fazem ele agir.
-async function responderSeMencionado(sock, m, jid) {
-  const texto = textoDaMensagem(m)
-  const contextInfo = m.message?.extendedTextMessage?.contextInfo
-  const meus = meusIdentificadores(sock)
-  const mencionou = (contextInfo?.mentionedJid || []).some((j) => meus.has(j.split('@')[0]))
-  if (!mencionou) return
-
-  const quotedMsg = contextInfo?.quotedMessage
-  const textoQuotado = quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || ''
-
-  const pergunta = texto.replace(/@\d+/g, '').trim() || '(a pessoa só mencionou o Faroleiro, sem pergunta)'
-  let conteudo = pergunta
-  if (textoQuotado) {
-    conteudo = `Mensagem que ela está respondendo: "${textoQuotado}"\n\nMensagem dela: ${pergunta}`
-  }
-
-  try {
-    const resposta = await perguntarIA(jid, conteudo)
-    if (resposta) await sock.sendMessage(jid, { text: resposta, quoted: m })
-  } catch (erro) {
-    console.error('IA (grupo):', erro)
-  }
-}
-
 async function handleGroupMessage(sock, m, groupJid) {
   const texto = textoDaMensagem(m).trim()
   const participant = m.key.participant
@@ -210,36 +176,6 @@ async function handleGroupMessage(sock, m, groupJid) {
     return
   }
 
-  const comandoResumoGrupo = comandoResumoMatch(texto) || comandoResumoNaturalMatch(texto)
-  if (comandoResumoGrupo) {
-    const topico = (comandoResumoGrupo[1]?.toLowerCase()) || (await identificarTopico(groupJid)) || 'bate_papo'
-    await comandoResumo(sock, participant, topico)
-    try {
-      await sock.sendMessage(groupJid, { text: 'Certo, já vou enviar no PV pra você. 💖' }, { quoted: m })
-    } catch (erro) {
-      console.error('confirmar resumo no grupo:', erro)
-    }
-    return
-  }
-
-  // "/duvida" (ou "dúvida", com/sem barra) direto no grupo — responde ali
-  // mesmo. Perguntas por menção (sem a palavra) já são tratadas em
-  // responderSeMencionado, mais pra frente.
-  const comandoDuvidaGrupo = texto.match(/^\/?d[uú]vida\b[\s:,-]*([\s\S]*)/i)
-  if (comandoDuvidaGrupo) {
-    const inscricao = await inscricaoDoJid(participant)
-    if (!inscricao) return
-    const pergunta = comandoDuvidaGrupo[1]?.trim()
-    if (!pergunta) return
-    try {
-      const resposta = await perguntarIA(participant, pergunta)
-      if (resposta) await sock.sendMessage(groupJid, { text: resposta, quoted: m })
-    } catch (erro) {
-      console.error('IA (/duvida grupo):', erro)
-    }
-    return
-  }
-
   if (!(await grupoAtivo(groupJid))) return
   const topico = await identificarTopico(groupJid)
   if (!topico) return
@@ -267,17 +203,11 @@ async function handleGroupMessage(sock, m, groupJid) {
 
   // "/transcreve" (com ou sem barra, podendo vir depois de mencionar o bot
   // tipo "@Faroleiro transcreve") respondendo um áudio pede a transcrição
-  // manual daquele áudio específico.
+  // manual daquele áudio específico. Não confirma nada — só processa calado
+  // e manda a transcrição quando sair.
   const textoSemMencao = texto.replace(/^(@[\d\s,]+)+/, '').trim()
   if (/^\/?transcreve\b/i.test(textoSemMencao)) {
-    const pedido = await processarComandoTranscreve(m, groupJid, topico)
-    if (pedido) {
-      try {
-        await sock.sendMessage(groupJid, { text: '🎧 Beleza, já volto com a transcrição.' }, { quoted: m })
-      } catch (erro) {
-        console.error('confirmar /transcreve:', erro)
-      }
-    }
+    await processarComandoTranscreve(m, groupJid, topico)
     return
   }
 
@@ -289,8 +219,6 @@ async function handleGroupMessage(sock, m, groupJid) {
     apelido: m.pushName || 'alguém',
     texto,
   })
-
-  await responderSeMencionado(sock, m, groupJid)
 }
 
 async function handleDM(sock, m, jid) {
