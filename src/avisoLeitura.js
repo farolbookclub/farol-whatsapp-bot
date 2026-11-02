@@ -42,6 +42,11 @@ function trechoEmocoes(p) {
   return p.emocoes && p.emocoes.length ? ` — se sentindo ${p.emocoes.join(', ')}` : ''
 }
 
+// Fonte vai no fim, depois de tudo (não é spoiler, só dizendo de onde veio).
+function trechoFonte(p) {
+  return p.fonte === 'maratona' ? ' (Fonte: MaratonaApp)' : ''
+}
+
 async function textoProgresso(p, livro) {
   const quem = await resolverMencao(p.nome)
   const titulo = `"${livro}"`
@@ -49,6 +54,7 @@ async function textoProgresso(p, livro) {
   if (p.tipo === 'abandono') {
     let texto = `📖 ${quem.texto}\nabandonou ${titulo} 🥀 — parou em: ${trechoProgresso(p)}${trechoEmocoes(p)}`
     texto += p.comentario ? ` e escreveu um motivo — pode conter spoiler, confira em ${SITE_MEMBRAS}` : ' e não deixou motivo.'
+    texto += trechoFonte(p)
     return { texto, mention: quem.mention }
   }
 
@@ -56,6 +62,7 @@ async function textoProgresso(p, livro) {
   const verbo = pct !== null && pct >= 100 ? 'terminou' : 'atualizou'
   let texto = `📖 ${quem.texto}\n${verbo} ${titulo}: ${trechoProgresso(p)}${trechoEmocoes(p)}`
   texto += p.comentario ? ` e escreveu algo — pode conter spoiler, confira em ${SITE_MEMBRAS}` : ' e não deixou comentários.'
+  texto += trechoFonte(p)
   return { texto, mention: quem.mention }
 }
 
