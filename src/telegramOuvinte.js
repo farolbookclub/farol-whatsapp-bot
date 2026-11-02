@@ -3,7 +3,15 @@ import input from 'input'
 import { TelegramClient } from 'telegram'
 import { StringSession } from 'telegram/sessions/index.js'
 import { NewMessage } from 'telegram/events/index.js'
+import { CustomFile } from 'telegram/client/uploads.js'
 import { supabase } from './supabase.js'
+
+function comLimiteDeTempo(promessa, ms, mensagemErro) {
+  return Promise.race([
+    promessa,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagemErro)), ms)),
+  ])
+}
 
 // Processo único que cuida de tudo que precisa de uma conta de pessoa (não
 // bot) no Telegram: ouvir o grupo onde o MaratonaApp posta atualizações de
@@ -51,12 +59,13 @@ async function processarAudioPendente(client, grupo, row) {
     const resp = await fetch(row.audio_url)
     if (!resp.ok) throw new Error(`não consegui baixar o áudio (${resp.status})`)
     const buffer = Buffer.from(await resp.arrayBuffer())
+    const arquivo = new CustomFile('audio.ogg', buffer.length, '', buffer)
 
-    const enviado = await client.sendFile(grupo, {
-      file: buffer,
-      voiceNote: true,
-      attributes: [],
-    })
+    const enviado = await comLimiteDeTempo(
+      client.sendFile(grupo, { file: arquivo, voiceNote: true }),
+      30 * 1000,
+      'demorou demais pra mandar o áudio pro Telegram',
+    )
 
     const transcricao = await new Promise((resolve) => {
       const timer = setTimeout(() => {
