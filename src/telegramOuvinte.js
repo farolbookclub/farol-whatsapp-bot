@@ -56,7 +56,7 @@ async function atualizarTranscricao(id, dados) {
 async function processarAudioPendente(client, grupo, row) {
   await atualizarTranscricao(row.id, { status: 'processando' })
   try {
-    const resp = await fetch(row.audio_url)
+    const resp = await comLimiteDeTempo(fetch(row.audio_url), 20 * 1000, 'demorou demais pra baixar o áudio')
     if (!resp.ok) throw new Error(`não consegui baixar o áudio (${resp.status})`)
     const buffer = Buffer.from(await resp.arrayBuffer())
     const arquivo = new CustomFile('audio.ogg', buffer.length, '', buffer)
