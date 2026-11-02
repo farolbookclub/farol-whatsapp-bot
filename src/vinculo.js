@@ -42,9 +42,12 @@ export async function vincularConta(jid, token) {
     return { ok: false, texto: 'Esse link já foi usado por outro número. Se trocou de número, chame a Administração.' }
   }
 
+  // removido_em explícito: se esse número já foi removido antes, o upsert
+  // (por padrão só atualiza as colunas informadas) deixaria a data antiga
+  // ali, e ela ficaria invisível pro bot pra sempre mesmo depois de vinculada de novo.
   const { error } = await supabase
     .from('whatsapp_membros')
-    .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1 }, { onConflict: 'jid' })
+    .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, removido_em: null }, { onConflict: 'jid' })
   if (error) throw error
   await marcarEntrouMembras(cadastro.id)
 
@@ -85,7 +88,10 @@ export async function vincularPorNumero(sock, jid) {
       if (resultado?.exists && (resultado.jid === jid || resultado.lid === jid)) {
         await supabase
           .from('whatsapp_membros')
-          .upsert({ jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, ja_nos_grupos: true }, { onConflict: 'jid' })
+          .upsert(
+            { jid, signup_id: c.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, ja_nos_grupos: true, removido_em: null },
+            { onConflict: 'jid' },
+          )
         await marcarEntrouMembras(c.id)
         return c
       }
