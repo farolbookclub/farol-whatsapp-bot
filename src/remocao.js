@@ -8,17 +8,24 @@ import { supabase } from './supabase.js'
 // Mensagem pra pessoa quando a admin cancela a inscrição por quebra de
 // regra — nada é dito pra saída voluntária ou "outro motivo" (ela decide
 // se fala por fora).
-function textoQuebraRegra(regra) {
+function diasSemInteragir(membro) {
+  const referencia = [membro?.ultima_interacao, membro?.entrou_em].filter(Boolean).sort().at(-1)
+  if (!referencia) return null
+  return Math.round((Date.now() - Date.parse(`${referencia}T00:00:00Z`)) / 86400000)
+}
+
+function textoQuebraRegra(regra, membro) {
   if (regra === '3_encontros') {
-    return 'Você foi removida do Farol devido a 3 ausências seguidas nos encontros presenciais. ' +
-      'Se quiser voltar algum dia, é só fazer uma nova inscrição. Obrigada por participar do clube! 💕'
+    return 'Você foi removida do Farol por faltar a 3 encontros presenciais seguidos. Para voltar, faça uma nova inscrição. ' +
+      'A entrada na modalidade presencial depende de vaga disponível. Obrigada por ter feito parte! 💕'
   }
   if (regra === 'ausencia_virtual') {
-    return 'Você foi removida do Farol por ficar muito tempo sem interagir nos grupos. ' +
-      'Se quiser voltar algum dia, é só fazer uma nova inscrição. Obrigada por participar do clube! 💕'
+    const dias = diasSemInteragir(membro)
+    return `Você foi removida do Farol porque ficou${dias ? ` ${dias} dias` : ' um tempo'} sem participar dos grupos. ` +
+      'Quando quiser voltar, é só fazer uma nova inscrição. Obrigada pelo tempo com a gente! 💕'
   }
   if (regra === 'desrespeito') {
-    return 'Você foi removida do Farol por não respeitar as regras de convivência da comunidade. Agradecemos a compreensão.'
+    return 'Você foi removida do Farol por descumprir as regras de convivência da comunidade. Agradecemos a compreensão.'
   }
   return null // "outro": só manda se a admin escreveu uma mensagem personalizada (ver pedido.mensagem_personalizada).
 }
@@ -38,7 +45,7 @@ export async function processarRemocoesPendentes(sock) {
   try {
     const { data: membro } = await supabase
       .from('whatsapp_membros')
-      .select('jid')
+      .select('jid, ultima_interacao, entrou_em')
       .eq('signup_id', pedido.signup_id)
       .is('removido_em', null)
       .maybeSingle()
@@ -59,7 +66,7 @@ export async function processarRemocoesPendentes(sock) {
         .eq('jid', membro.jid)
 
       if (pedido.motivo === 'quebra_regra' && pedido.enviar_mensagem !== false) {
-        const texto = pedido.regra === 'outro' ? pedido.mensagem_personalizada || null : textoQuebraRegra(pedido.regra)
+        const texto = pedido.regra === 'outro' ? pedido.mensagem_personalizada || null : textoQuebraRegra(pedido.regra, membro)
         if (texto) {
           try {
             await sock.sendMessage(membro.jid, { text: texto })
