@@ -77,16 +77,17 @@ const INTERVALO_CONFERENCIA_MS = 5000
 // achar uma resposta pronta de verdade. Cobre os três casos: resposta numa
 // mensagem só, resposta em pedaços tipo "[2/6]" (espera o número bater com
 // o total) e resposta longa dividida em mais de uma mensagem (junta todas).
-async function aguardarTranscricao(client, grupo, msgId) {
+async function aguardarTranscricao(client, grupo, msgId, transcriberId) {
   const tentativasMax = Math.ceil(TIMEOUT_TRANSCRICAO_MS / INTERVALO_CONFERENCIA_MS)
   for (let tentativa = 0; tentativa < tentativasMax; tentativa++) {
     await new Promise((resolve) => setTimeout(resolve, INTERVALO_CONFERENCIA_MS))
     try {
       const mensagens = await client.getMessages(grupo, { minId: msgId, limit: 10 })
       const respostas = mensagens
-        // Ignora qualquer coisa que pareça atualização do Maratona, caso
-        // uma caia bem no meio da espera da transcrição.
-        .filter((m) => m.id > msgId && (m.message || '').trim() && !/\s+(atualizou|finalizou|terminou)\s+"/i.test(m.message))
+        // Só mensagens do bot de transcrição mesmo — ele é um remetente
+        // diferente do bot do Maratona, então filtra por quem mandou, não
+        // por tentar adivinhar pelo conteúdo.
+        .filter((m) => m.id > msgId && (m.message || '').trim() && String(m.senderId) === String(transcriberId))
         .sort((a, b) => a.id - b.id)
       if (!respostas.length) continue
 
@@ -112,7 +113,7 @@ async function atualizarTranscricao(id, dados) {
   if (error) console.error('atualizar transcrição:', error.message)
 }
 
-async function processarAudioPendente(client, grupo, row) {
+async function processarAudioPendente(client, grupo, transcriberId, row) {
   await atualizarTranscricao(row.id, { status: 'processando' })
   try {
     const resp = await comLimiteDeTempo(fetch(row.audio_url), 20 * 1000, 'demorou demais pra baixar o áudio')
@@ -126,7 +127,7 @@ async function processarAudioPendente(client, grupo, row) {
       'demorou demais pra mandar o áudio pro Telegram',
     )
 
-    const transcricao = await aguardarTranscricao(client, grupo, enviado.id)
+    const transcricao = await aguardarTranscricao(client, grupo, enviado.id, transcriberId)
 
     if (transcricao) {
       await atualizarTranscricao(row.id, { status: 'concluido', transcricao, concluido_em: new Date().toISOString() })
@@ -143,7 +144,7 @@ async function processarAudioPendente(client, grupo, row) {
 // áudio com a de outro, já que a correlação é por "respondeu a essa
 // mensagem que eu mandei").
 let filaTranscricaoRodando = false
-async function processarFilaTranscricoes(client, grupo) {
+async function processarFilaTranscricoes(client, grupo, transcriberId) {
   if (filaTranscricaoRodando) return
   filaTranscricaoRodando = true
   try {
@@ -156,7 +157,7 @@ async function processarFilaTranscricoes(client, grupo) {
         .limit(1)
         .maybeSingle()
       if (!proximo) break
-      await processarAudioPendente(client, grupo, proximo)
+      await processarAudioPendente(client, grupo, transcriberId, proximo)
     }
   } finally {
     filaTranscricaoRodando = false
@@ -191,6 +192,14 @@ export async function iniciarOuvinteTelegram() {
   }
   const grupo = dialogoGrupo.entity
 
+  let transcriberId = null
+  try {
+    const transcriberEntity = await client.getEntity(TRANSCRIBER_USERNAME)
+    transcriberId = transcriberEntity.id
+  } catch (erro) {
+    console.error(`[Telegram] Não achei o bot de transcrição (@${TRANSCRIBER_USERNAME}) — transcrição de áudio desligada. Maratona continua funcionando.`, erro)
+  }
+
   async function processarMensagem(event) {
     try {
       const message = event.message
@@ -216,16 +225,18 @@ export async function iniciarOuvinteTelegram() {
 
   client.addEventHandler(processarMensagem, new NewMessage({}))
 
-  // Realtime: novo pedido de transcrição -> entra na fila.
-  supabase
-    .channel('transcricoes-pedido-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transcricoes_pendentes' }, (payload) => {
-      if (payload.new.status === 'pendente') processarFilaTranscricoes(client, grupo)
-    })
-    .subscribe()
+  // Realtime: novo pedido de transcrição -> entra na fila (só se achou o bot).
+  if (transcriberId) {
+    supabase
+      .channel('transcricoes-pedido-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transcricoes_pendentes' }, (payload) => {
+        if (payload.new.status === 'pendente') processarFilaTranscricoes(client, grupo, transcriberId)
+      })
+      .subscribe()
 
-  // Pega o que ficou pendente de antes de o processo iniciar (ex.: reinício).
-  processarFilaTranscricoes(client, grupo)
+    // Pega o que ficou pendente de antes de o processo iniciar (ex.: reinício).
+    processarFilaTranscricoes(client, grupo, transcriberId)
+  }
 
   console.log(`[Telegram] Ouvindo o grupo "${GRUPO_NOME}" (Maratona + transcrição de áudio, bot: @${TRANSCRIBER_USERNAME}).`)
 }
