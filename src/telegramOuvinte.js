@@ -152,12 +152,17 @@ export async function iniciarOuvinteTelegram() {
       const sender = await message.getSender()
       if (!sender?.bot) return
 
-      // Resposta do bot de transcrição a um áudio que a gente mandou.
+      // Resposta do bot de transcrição a um áudio que a gente mandou. Ele
+      // manda 2 mensagens: primeiro um "Transcrevendo..." provisório, depois
+      // o texto de verdade (com "Texto:" na frente) — ignora a provisória e
+      // só resolve quando chegar a de verdade.
       const respondendoA = message.replyTo?.replyToMsgId
       if (respondendoA && aguardandoTranscricao.has(respondendoA)) {
+        const texto = message.message.trim()
+        if (/^transcrevendo/i.test(texto)) return // provisório, ainda não é a resposta final
         const resolver = aguardandoTranscricao.get(respondendoA)
         aguardandoTranscricao.delete(respondendoA)
-        resolver(message.message.trim())
+        resolver(texto.replace(/^texto\s*:\s*/i, ''))
         return
       }
 
