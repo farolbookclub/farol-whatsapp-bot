@@ -73,7 +73,7 @@ async function grupoTemMembro(sock, groupJid, jid) {
 
 const COMANDOS_PV =
   'Se precisar de ajuda, pode me mandar aqui no privado:\n' +
-  '/duvida + sua pergunta — tento te ajudar! Se eu não souber, te mando perguntar no grupo Bate-papo e mencionar a Kah 💖'
+  '/duvida + sua pergunta — tento te ajudar! Se eu não souber, te mando perguntar no grupo Bate-papo mencionando a Kah, ou chamar ela no privado 💖'
 
 // Última etapa do guia: confere de verdade (via groupMetadata) em quais
 // grupos a pessoa já está — manda link só do que realmente falta entrar,
