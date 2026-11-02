@@ -35,6 +35,18 @@ function textoDaMensagem(m) {
   return msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption || msg.videoMessage?.caption || ''
 }
 
+// Boas-vindas pública no grupo Bate-papo, mencionando quem entrou.
+async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome) {
+  try {
+    await sock.sendMessage(groupJid, {
+      text: `Seja bem-vinda *${nome}* (@${participantJid.split('@')[0].split(':')[0]}) ao Farol! 🎉 Estamos felizes em ter você conosco 🥹, se quiser fique a vontade para se apresentar! 💖`,
+      mentions: [participantJid],
+    })
+  } catch (erro) {
+    console.error('boas-vindas no grupo:', erro)
+  }
+}
+
 // Aprova ou recusa um pedido de entrada, conferindo a inscrição vinculada ao
 // número. Mesma regra do Telegram: só quem está aprovada e vinculada entra,
 // e o grupo Presencial é só pra quem é do formato presencial.
@@ -404,12 +416,14 @@ async function connectToWhatsApp() {
         for (const participantJid of update.participants) {
           const jaInscrita = await inscricaoDoJid(participantJid)
           if (jaInscrita) {
+            if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, jaInscrita.apelido || jaInscrita.nome)
             await avisarAdminEntrouSaiu('entrou', { apelido: jaInscrita.apelido || jaInscrita.nome, formato: jaInscrita.formato })
             continue
           }
           const encontrada = await vincularPorNumero(sock, participantJid)
           if (encontrada) {
             const nome = encontrada.apelido || encontrada.nome
+            if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, nome)
             try {
               await iniciarGuia(sock, participantJid, nome, true)
             } catch (erro) {
