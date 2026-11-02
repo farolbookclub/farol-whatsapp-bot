@@ -46,7 +46,7 @@ async function textoProgresso(p, livro) {
   texto += `* *${abandono ? 'Parou em' : 'Progresso'}:* ${trechoProgresso(p)}\n`
   if (p.emocoes?.length) texto += `* *Emoções:* ${p.emocoes.join(', ')}\n`
   if (p.comentario) texto += `* *Comentário*: Confira em ${SITE_MEMBRAS}, pode conter spoiler.\n`
-  if (p.fonte === 'maratona') texto += `* *Fonte:* MaratonaApp\n`
+  if (p.fonte === 'maratona') texto += `\n_Fonte: MaratonaApp_`
 
   return { texto: texto.trim(), mention: quem.mention }
 }
