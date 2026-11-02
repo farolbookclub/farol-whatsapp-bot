@@ -7,7 +7,7 @@ import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, d
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { iniciarEscutaLeitura } from './avisoLeitura.js'
-import { processarAudioGrupo, processarComandoTranscreve, iniciarEscutaTranscricoes } from './transcricao.js'
+import { processarAudioGrupo, processarComandoTranscreve, processarAudioPV, processarComandoTranscrevePV, iniciarEscutaTranscricoes } from './transcricao.js'
 import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
@@ -240,6 +240,17 @@ async function handleDM(sock, m, jid) {
   // que mande, sem responder nada.
   const inscricao = await inscricaoDoJid(jid)
   if (!inscricao) return
+
+  // Áudio mandado direto no privado, ou /transcreve respondendo um áudio no
+  // privado: transcreve igual no grupo, mas devolve aqui mesmo, sem avisar nada.
+  if (m.message?.audioMessage) {
+    await processarAudioPV(m, jid)
+    return
+  }
+  if (/^\/?transcreve\b/i.test(texto)) {
+    await processarComandoTranscrevePV(m, jid)
+    return
+  }
 
   if (/^\/ajuda$/i.test(texto)) {
     await sock.sendMessage(jid, { text: `Comandos do Faroleiro:\n\n${AJUDA_COMANDOS}` })

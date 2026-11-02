@@ -63,6 +63,24 @@ export async function processarComandoTranscreve(m, groupJid, topico) {
   return true
 }
 
+// Mesma coisa, só que no privado: áudio mandado direto pro bot no PV.
+export async function processarAudioPV(m, jid) {
+  if (!m.message?.audioMessage) return
+  await enfileirarTranscricao(m, { groupJid: jid, msgId: m.key.id, participant: null, topico: 'pv' })
+}
+
+// "/transcreve" no privado, respondendo um áudio (dela mesma pro bot).
+export async function processarComandoTranscrevePV(m, jid) {
+  const citado = m.message?.extendedTextMessage?.contextInfo
+  const audioCitado = citado?.quotedMessage?.audioMessage
+  if (!audioCitado) return false
+
+  const msgId = citado.stanzaId
+  const mensagemCitada = { key: { remoteJid: jid, id: msgId, fromMe: false }, message: citado.quotedMessage }
+  await enfileirarTranscricao(mensagemCitada, { groupJid: jid, msgId, participant: null, topico: 'pv' })
+  return true
+}
+
 // Escuta (Realtime, sem polling) quando uma transcrição fica pronta e posta
 // no grupo de origem, como resposta à mensagem do áudio.
 export function iniciarEscutaTranscricoes(getSock) {
