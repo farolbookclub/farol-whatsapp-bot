@@ -128,7 +128,7 @@ export async function desvincularECancelar(jid, signupId, motivo) {
 export async function inscricaoDoJid(jid) {
   const { data } = await supabase
     .from('whatsapp_membros')
-    .select('signups (status, apelido, nome, formato)')
+    .select('signups (status, apelido, nome, formato, revisao_manual)')
     .eq('jid', jid)
     .is('removido_em', null)
     .maybeSingle()

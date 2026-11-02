@@ -21,6 +21,10 @@ export async function avisarAdminEntrouSaiu(tipo, dados) {
   await chamarNotifyAdminPush({ tipo, ...dados })
 }
 
+export async function avisarAdminRevisaoManual(apelido) {
+  await chamarNotifyAdminPush({ tipo: 'revisao_manual', apelido })
+}
+
 // Erro de verdade (bug) no Faroleiro: avisa a Administração, igual o
 // Telegram já faz. Com um intervalo mínimo entre avisos pra não floodar o
 // celular dela se o mesmo erro ficar se repetindo (ex: numa reconexão).

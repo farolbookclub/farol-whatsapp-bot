@@ -19,7 +19,7 @@ import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
-import { avisarAdminEntrouSaiu, avisarAdminErro } from './pushAdmin.js'
+import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
 
 const AJUDA_COMANDOS = '/duvida + sua pergunta — tento te ajudar 💖'
 
@@ -47,6 +47,10 @@ async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome) {
   }
 }
 
+// Pedidos já sinalizados pra revisão manual nessa execução (evita avisar a
+// mesma admin de novo a cada reconexão enquanto o pedido continuar parado).
+const revisaoManualAvisada = new Set()
+
 // Aprova ou recusa um pedido de entrada, conferindo a inscrição vinculada ao
 // número. Mesma regra do Telegram: só quem está aprovada e vinculada entra,
 // e o grupo Presencial é só pra quem é do formato presencial.
@@ -54,6 +58,15 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
   const inscricao = await inscricaoDoJid(participantJid)
   const topico = await identificarTopico(groupJid)
   const pode = inscricao && (topico !== 'presencial' || inscricao.formato === 'presencial')
+
+  if (pode && inscricao.revisao_manual) {
+    const chave = `${groupJid}:${participantJid}`
+    if (!revisaoManualAvisada.has(chave)) {
+      revisaoManualAvisada.add(chave)
+      await avisarAdminRevisaoManual(inscricao.apelido || inscricao.nome)
+    }
+    return // fica pendente, sem aprovar/recusar nem avisar a pessoa
+  }
 
   if (pode) {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'approve')
