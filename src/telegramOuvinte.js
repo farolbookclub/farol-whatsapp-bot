@@ -122,7 +122,15 @@ export async function iniciarOuvinteTelegram() {
   fs.writeFileSync(SESSION_FILE, client.session.save())
   console.log('[Telegram] Conectado.')
 
-  const grupo = await client.getEntity(GRUPO_NOME)
+  // client.getEntity(texto) não é confiável pra grupo sem link público —
+  // procura nos diálogos da conta pelo título mesmo, que é garantido.
+  const dialogos = await client.getDialogs({})
+  const dialogoGrupo = dialogos.find((d) => d.title === GRUPO_NOME)
+  if (!dialogoGrupo) {
+    console.error(`[Telegram] Grupo "${GRUPO_NOME}" não encontrado nos diálogos dessa conta — confira o nome exato (TELEGRAM_GRUPO) ou se a conta está mesmo no grupo.`)
+    return
+  }
+  const grupo = dialogoGrupo.entity
 
   client.addEventHandler(async (event) => {
     try {
