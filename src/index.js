@@ -235,9 +235,11 @@ async function handleGroupMessage(sock, m, groupJid) {
     return
   }
 
-  // "/transcreve" respondendo um áudio (de qualquer hora) pede a
-  // transcrição manual daquele áudio específico.
-  if (/^\/transcreve\b/i.test(texto)) {
+  // "/transcreve" (com ou sem barra, podendo vir depois de mencionar o bot
+  // tipo "@Faroleiro transcreve") respondendo um áudio pede a transcrição
+  // manual daquele áudio específico.
+  const textoSemMencao = texto.replace(/^(@[\d\s,]+)+/, '').trim()
+  if (/^\/?transcreve\b/i.test(textoSemMencao)) {
     const pedido = await processarComandoTranscreve(m, groupJid, topico)
     if (pedido) {
       try {
