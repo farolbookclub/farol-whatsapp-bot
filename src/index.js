@@ -146,26 +146,24 @@ async function estaEmAlgumGrupoAtivo(sock, jid) {
   return false
 }
 
-// Mesma regra do Telegram: responde a pergunta pra IA só quando mencionam o
-// bot ou respondem a uma resposta dela (não a avisos automáticos do bot).
+// Só responde em grupo quando mencionam o bot de verdade — não reage mais
+// a quem só responde (quoted) alguma mensagem dele (tipo a transcrição),
+// isso evita o bot "entrar na conversa" sem ser chamado. Fora isso, só
+// comandos explícitos (/duvida, /resumo, /transcreve) fazem ele agir.
 async function responderSeMencionado(sock, m, jid) {
   const texto = textoDaMensagem(m)
   const contextInfo = m.message?.extendedTextMessage?.contextInfo
   const meus = meusIdentificadores(sock)
   const mencionou = (contextInfo?.mentionedJid || []).some((j) => meus.has(j.split('@')[0]))
+  if (!mencionou) return
 
-  const participanteOriginal = contextInfo?.participant
   const quotedMsg = contextInfo?.quotedMessage
   const textoQuotado = quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || ''
-  const avisoAutomatico = /^(Pronto, você entrou|Oii .+! (Conta vinculada|Reconheci)|🤫|📖|✨ Resumo|Agora é só entrar|Nossa comunidade|Responda Ok)/.test(textoQuotado)
-  const respondeuBot = participanteOriginal && meus.has(participanteOriginal.split('@')[0]) && !avisoAutomatico
-
-  if (!mencionou && !respondeuBot) return
 
   const pergunta = texto.replace(/@\d+/g, '').trim() || '(a pessoa só mencionou o Faroleiro, sem pergunta)'
   let conteudo = pergunta
   if (textoQuotado) {
-    conteudo = (respondeuBot ? `Sua mensagem anterior: "${textoQuotado}"` : `Mensagem que ela está respondendo: "${textoQuotado}"`) + `\n\nMensagem dela: ${pergunta}`
+    conteudo = `Mensagem que ela está respondendo: "${textoQuotado}"\n\nMensagem dela: ${pergunta}`
   }
 
   try {
