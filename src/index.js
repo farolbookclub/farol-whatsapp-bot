@@ -94,8 +94,17 @@ async function processarPendentes(sock) {
   }
 }
 
+// Flexível: com ou sem barra, com ou sem _/-/espaço antes do tópico — "/resumo",
+// "resumo", "/resumo_leitura", "resumo leitura", "resumoleitura" etc.
 function comandoResumoMatch(texto) {
-  return String(texto || '').trim().match(/^\/resumo(?:[-_](leitura|avisos|presencial))?$/i)
+  const t = String(texto || '').trim()
+  return t.match(/^\/?resumo[\s_-]*(leitura|avisos|presencial)?$/i)
+}
+
+// "resume o/esse grupo" — jeito natural de pedir o resumo do grupo atual
+// (mesma coisa que "/resumo" sem tópico, só reconhece em grupo).
+function comandoResumoNaturalMatch(texto) {
+  return String(texto || '').trim().match(/^resume\s+(o|esse|este)\s+grupo$/i)
 }
 
 async function comandoResumo(sock, jid, topicoForcado) {
@@ -203,10 +212,33 @@ async function handleGroupMessage(sock, m, groupJid) {
     return
   }
 
-  const comandoResumoGrupo = comandoResumoMatch(texto)
+  const comandoResumoGrupo = comandoResumoMatch(texto) || comandoResumoNaturalMatch(texto)
   if (comandoResumoGrupo) {
     const topico = (comandoResumoGrupo[1]?.toLowerCase()) || (await identificarTopico(groupJid)) || 'bate_papo'
     await comandoResumo(sock, participant, topico)
+    try {
+      await sock.sendMessage(groupJid, { text: 'Certo, já vou enviar no PV pra você. 💖' }, { quoted: m })
+    } catch (erro) {
+      console.error('confirmar resumo no grupo:', erro)
+    }
+    return
+  }
+
+  // "/duvida" (ou "dúvida", com/sem barra) direto no grupo — responde ali
+  // mesmo. Perguntas por menção (sem a palavra) já são tratadas em
+  // responderSeMencionado, mais pra frente.
+  const comandoDuvidaGrupo = texto.match(/^\/?d[uú]vida\b[\s:,-]*([\s\S]*)/i)
+  if (comandoDuvidaGrupo) {
+    const inscricao = await inscricaoDoJid(participant)
+    if (!inscricao) return
+    const pergunta = comandoDuvidaGrupo[1]?.trim()
+    if (!pergunta) return
+    try {
+      const resposta = await perguntarIA(participant, pergunta)
+      if (resposta) await sock.sendMessage(groupJid, { text: resposta, quoted: m })
+    } catch (erro) {
+      console.error('IA (/duvida grupo):', erro)
+    }
     return
   }
 
@@ -243,7 +275,7 @@ async function handleGroupMessage(sock, m, groupJid) {
     const pedido = await processarComandoTranscreve(m, groupJid, topico)
     if (pedido) {
       try {
-        await sock.sendMessage(groupJid, { text: '🎧 Pedido, já volto com a transcrição.' }, { quoted: m })
+        await sock.sendMessage(groupJid, { text: '🎧 Beleza, já volto com a transcrição.' }, { quoted: m })
       } catch (erro) {
         console.error('confirmar /transcreve:', erro)
       }
@@ -317,7 +349,7 @@ async function handleDM(sock, m, jid) {
     return
   }
 
-  const comandoDuvida = texto.match(/^\/duvida\s+([\s\S]+)/i)
+  const comandoDuvida = texto.match(/^\/?d[uú]vida[\s:,-]+([\s\S]+)/i)
   if (comandoDuvida) {
     const inscricao = await inscricaoDoJid(jid)
     if (!inscricao) {
