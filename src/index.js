@@ -23,8 +23,6 @@ import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from
 
 const AJUDA_COMANDOS = '/duvida + sua pergunta — tento te ajudar 💖'
 
-const AJUDA = 'Oi! Aqui é o Faroleiro, o robô do Farol 💖 Pra entrar na comunidade, use o botão "Entrar no WhatsApp" na página Minha inscrição, no site do Farol.'
-
 // Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
 let sockAtual = null
 let escutaLeituraIniciada = false
@@ -78,12 +76,15 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
     }
   } else {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'reject')
-    try {
-      await sock.sendMessage(participantJid, {
-        text: inscricao ? 'Esse grupo é só para quem participa do Farol Presencial.' : AJUDA,
-      })
-    } catch (erro) {
-      console.error('aviso de recusa:', erro)
+    // Sem inscrição (nunca foi, ou saiu/foi removida): recusa quieta, sem
+    // mandar nada. Só avisa quando é integrante de verdade, só que no
+    // formato errado (ex: online tentando entrar no grupo Presencial).
+    if (inscricao) {
+      try {
+        await sock.sendMessage(participantJid, { text: 'Esse grupo é só para quem participa do Farol Presencial.' })
+      } catch (erro) {
+        console.error('aviso de recusa:', erro)
+      }
     }
   }
 }
@@ -234,6 +235,12 @@ async function handleDM(sock, m, jid) {
 
   if (await tentarAvancarGuia(sock, jid, texto)) return
 
+  // Dali pra baixo é tudo só pra quem é integrante de verdade (vinculada e
+  // aprovada): não é do clube, ou saiu/foi removida — ignora qualquer coisa
+  // que mande, sem responder nada.
+  const inscricao = await inscricaoDoJid(jid)
+  if (!inscricao) return
+
   if (/^\/ajuda$/i.test(texto)) {
     await sock.sendMessage(jid, { text: `Comandos do Faroleiro:\n\n${AJUDA_COMANDOS}` })
     return
@@ -241,23 +248,12 @@ async function handleDM(sock, m, jid) {
 
   const comandoDuvida = texto.match(/^\/?d[uú]vida[\s:,-]+([\s\S]+)/i)
   if (comandoDuvida) {
-    const inscricao = await inscricaoDoJid(jid)
-    if (!inscricao) {
-      await sock.sendMessage(jid, { text: 'Esse comando é só pra quem é integrante do Farol 💖' })
-      return
-    }
     try {
       const resposta = await perguntarIA(jid, comandoDuvida[1].trim())
       if (resposta) await sock.sendMessage(jid, { text: resposta })
     } catch (erro) {
       console.error('IA (/duvida):', erro)
     }
-    return
-  }
-
-  const inscricao = await inscricaoDoJid(jid)
-  if (!inscricao) {
-    await sock.sendMessage(jid, { text: AJUDA })
     return
   }
 
