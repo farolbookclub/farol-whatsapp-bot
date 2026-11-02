@@ -246,6 +246,11 @@ async function handleDM(sock, m, jid) {
     return
   }
 
+  // Pedido de resumo (função removida), de qualquer jeito que venha — comando
+  // antigo ou pedido em texto livre tipo "me resume o livro"/"resuma o
+  // grupo": ignora, não manda pra IA.
+  if (/resum[iao]/i.test(texto)) return
+
   const comandoDuvida = texto.match(/^\/?d[uú]vida[\s:,-]+([\s\S]+)/i)
   if (comandoDuvida) {
     try {
@@ -258,7 +263,7 @@ async function handleDM(sock, m, jid) {
   }
 
   // Parece comando (começa com "/") mas não é nenhum reconhecido: ignora,
-  // não manda pra IA (ex.: /resumo, que não existe mais).
+  // não manda pra IA (ex.: /resumo_avisos, que não existe mais).
   if (/^\//.test(texto)) return
 
   // Mensagem livre de quem já é integrante: trata como pergunta pra IA.
