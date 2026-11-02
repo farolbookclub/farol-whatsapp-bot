@@ -5,10 +5,29 @@ import { supabase } from './supabase.js'
 // público — não dá pra chamar na hora). Tira a pessoa de todos os grupos
 // ativos e desvincula o número. Re-entrada fica bloqueada naturalmente: o
 // join-request só aprova quem está com inscrição aprovada.
+// Mensagem pra pessoa quando a admin cancela a inscrição por quebra de
+// regra — nada é dito pra saída voluntária ou "outro motivo" (ela decide
+// se fala por fora).
+function textoQuebraRegra(regra, detalhe) {
+  if (regra === '3_encontros') {
+    return 'Você foi removida do Farol por ter faltado a 3 encontros presenciais sem avisar. ' +
+      'Se quiser voltar algum dia, é só fazer uma nova inscrição 💕'
+  }
+  if (regra === 'ausencia_virtual') {
+    return 'Você foi removida do Farol por ficar muito tempo sem participar/interagir nos grupos. ' +
+      'Se quiser voltar algum dia, é só fazer uma nova inscrição 💕'
+  }
+  if (regra === 'desrespeito') {
+    return 'Você foi removida do Farol por não respeitar as regras de convivência da comunidade.' +
+      (detalhe && detalhe !== 'Desrespeito' ? `\n\nMotivo: ${detalhe}` : '')
+  }
+  return `Você foi removida do Farol.${detalhe ? `\n\nMotivo: ${detalhe}` : ''}`
+}
+
 export async function processarRemocoesPendentes(sock) {
   const { data: pedido } = await supabase
     .from('whatsapp_remocoes')
-    .select('id, signup_id')
+    .select('id, signup_id, motivo, regra, detalhe')
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true })
     .limit(1)
@@ -39,6 +58,14 @@ export async function processarRemocoesPendentes(sock) {
         .from('whatsapp_membros')
         .update({ removido_em: new Date().toISOString().slice(0, 10), signup_id: null })
         .eq('jid', membro.jid)
+
+      if (pedido.motivo === 'quebra_regra') {
+        try {
+          await sock.sendMessage(membro.jid, { text: textoQuebraRegra(pedido.regra, pedido.detalhe) })
+        } catch (erro) {
+          console.error(`aviso de remoção por quebra de regra ${membro.jid}:`, erro)
+        }
+      }
     }
 
     await supabase.from('whatsapp_remocoes').update({ status: 'concluido', concluido_em: new Date().toISOString() }).eq('id', pedido.id)
