@@ -70,7 +70,7 @@ async function repassarMaratonaPraWebhook(texto, botoes) {
   }
 }
 
-const INTERVALO_CONFERENCIA_MS = 3000
+const INTERVALO_CONFERENCIA_MS = 1000
 
 // Fica conferindo (a cada 5s, só enquanto esse áudio estiver pendente — não
 // pra sempre) as mensagens que vieram depois da que a gente mandou, até
