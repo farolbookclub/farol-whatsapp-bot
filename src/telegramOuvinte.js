@@ -5,6 +5,7 @@ import { StringSession } from 'telegram/sessions/index.js'
 import { NewMessage } from 'telegram/events/index.js'
 import { CustomFile } from 'telegram/client/uploads.js'
 import { supabase } from './supabase.js'
+import { avisarAdminErro } from './pushAdmin.js'
 
 function ehProvisoria(texto) {
   return /^(transcrevendo|transcribing)\.{3}/i.test(texto)
@@ -133,10 +134,12 @@ async function processarAudioPendente(client, grupo, transcriberId, row) {
       await atualizarTranscricao(row.id, { status: 'concluido', transcricao, concluido_em: new Date().toISOString() })
     } else {
       await atualizarTranscricao(row.id, { status: 'erro', erro: 'o bot de transcrição não respondeu a tempo', concluido_em: new Date().toISOString() })
+      await avisarAdminErro('Uma transcrição de áudio falhou: o bot de transcrição não respondeu a tempo.')
     }
   } catch (erro) {
     console.error('processarAudioPendente:', erro)
     await atualizarTranscricao(row.id, { status: 'erro', erro: erro?.message || 'falha desconhecida', concluido_em: new Date().toISOString() })
+    await avisarAdminErro(`Uma transcrição de áudio falhou: ${erro?.message || 'falha desconhecida'}.`)
   }
 }
 
