@@ -49,6 +49,17 @@ function escaparMarcacao(texto) {
   return String(texto || 'nossa membra')
 }
 
+// Busca o "Nome ou apelido de exibição" (membras.nome_exibicao) de um lote de
+// inscrições — é ele que deve aparecer, não o apelido/nome do cadastro.
+// Devolve uma função (signupId, fallback) -> nome pronto pra usar.
+async function nomesExibicaoPorSignup(signupIds) {
+  const ids = [...new Set((signupIds ?? []).filter(Boolean))]
+  if (!ids.length) return (_id, fallback) => fallback
+  const { data } = await supabase.from('membras').select('signup_id, nome_exibicao').in('signup_id', ids)
+  const mapa = new Map((data ?? []).filter((m) => m.nome_exibicao).map((m) => [m.signup_id, m.nome_exibicao]))
+  return (id, fallback) => mapa.get(id) || fallback
+}
+
 // Números (sem @sufixo) de um participante do grupo, cobrindo @lid.
 function numerosDoParticipante(p) {
   const nums = new Set()
@@ -101,7 +112,7 @@ async function aniversarios(sock, hoje) {
 
   const { data: membros, error } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signups (status, apelido, nome, aniversario)')
+    .select('jid, signup_id, signups (status, apelido, nome, aniversario)')
     .is('removido_em', null)
     .not('signup_id', 'is', null)
   if (error) throw error
@@ -121,7 +132,8 @@ async function aniversarios(sock, hoje) {
   }
 
   if (aniversariantes.length > 0) {
-    const pessoas = aniversariantes.map((m) => `*${escaparMarcacao(m.signups.apelido || m.signups.nome)}* (@${numeroDoJid(m.jid)})`)
+    const nomeDe = await nomesExibicaoPorSignup(aniversariantes.map((m) => m.signup_id))
+    const pessoas = aniversariantes.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups.apelido || m.signups.nome))}* (@${numeroDoJid(m.jid)})`)
     const texto = aniversariantes.length === 1
       ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉 Parabéns, que seu novo ciclo seja cheio de livros incríveis e momentos lindos! 💕`
       : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉 Parabéns, que o novo ciclo de vocês seja cheio de livros incríveis e momentos lindos! 💕`
@@ -217,9 +229,10 @@ async function aniversariosClube(sock, hoje) {
 
   let postados = 0
   for (const [marco, grupo] of porMarco) {
+    const nomeDe = await nomesExibicaoPorSignup(grupo.map((m) => m.signup_id))
     const ehMeses = marco.includes('mês') || marco.includes('meses')
-    const pessoas = grupo.map((m) => `*${escaparMarcacao(m.signups?.apelido || m.signups?.nome)}* (@${numeroDoJid(m.jid)})`)
-    const nomes = grupo.map((m) => escaparMarcacao(m.signups?.apelido || m.signups?.nome))
+    const pessoas = grupo.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome))}* (@${numeroDoJid(m.jid)})`)
+    const nomes = grupo.map((m) => escaparMarcacao(nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome)))
     const singular = grupo.length === 1
 
     const texto = singular
