@@ -11,8 +11,17 @@ function nota(n) {
   return n.toFixed(1).replace('.', ',')
 }
 
-const nomeVis = (nome) => (String(nome).startsWith('Ex-membra ') ? 'Ex-membra' : nome === 'Karine' ? 'Kah' : nome)
 const EMOCAO_ANTIGA = { blé: 'nhé...', nhé: 'nhé...' }
+
+// "nome" (membras.nome / progresso_leitura.nome / public_ratings.nome_publico)
+// é só a chave interna — quem aparece de verdade é sempre o "Nome ou apelido
+// de exibição" (membras.nome_exibicao), igual no site.
+async function mapaNomesExibicao() {
+  const { data } = await supabase.from('membras').select('nome, nome_exibicao')
+  const mapa = {}
+  for (const m of data ?? []) if (m.nome_exibicao) mapa[m.nome] = m.nome_exibicao
+  return mapa
+}
 
 function pctProgresso(p) {
   if (p.modo === 'porcentagem') return Math.min(100, Math.max(0, Number(p.valor)))
@@ -53,10 +62,12 @@ function dataCurta(valor) {
 }
 
 async function leituraDasMembras(bookId) {
-  const [{ data: avaliacoes }, { data: progresso }] = await Promise.all([
+  const [{ data: avaliacoes }, { data: progresso }, mapaExibicao] = await Promise.all([
     supabase.from('public_ratings').select('nome_publico, rating, is_favorite, abandoned, did_not_read, is_reading').eq('book_id', bookId),
     supabase.from('progresso_leitura').select('nome, modo, valor, total, tipo, emocoes, comentario, created_at').eq('book_id', bookId).order('created_at'),
+    mapaNomesExibicao(),
   ])
+  const nomeVis = (nome) => (String(nome).startsWith('Ex-membra ') ? 'Ex-membra' : mapaExibicao[nome] || nome)
 
   const ultimo = {}
   for (const p of progresso ?? []) ultimo[p.nome] = p

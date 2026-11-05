@@ -2,10 +2,6 @@ import { supabase } from './supabase.js'
 
 const SITE_MEMBRAS = 'http://membrosfarol.vercel.app/'
 
-function nomeVis(nome) {
-  return nome === 'Karine' ? 'Kah' : nome
-}
-
 function horas(min) {
   const m = Math.round(min || 0)
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`
@@ -24,11 +20,13 @@ function trechoProgresso(p) {
   return p.total ? `${horas(p.valor)}/${horas(p.total)}${pctTxt} de audiobook` : `${horas(p.valor)} de audiobook`
 }
 
-// Nome escolhido no site -> membras.signup_id -> conta do WhatsApp vinculada.
+// "nome" aqui é a chave interna (membras.nome, "Nome completo" do painel) —
+// só serve pra achar a linha certa. Quem aparece de verdade é sempre o
+// "Nome ou apelido de exibição" (membras.nome_exibicao), igual no site.
 // Vinculada: "*Nome* (@numero)" (o @ notifica). Senão, só o nome em negrito.
 async function resolverMencao(nome) {
-  const exibido = nomeVis(nome)
-  const { data: m } = await supabase.from('membras').select('signup_id').eq('nome', nome).not('signup_id', 'is', null).limit(1).maybeSingle()
+  const { data: m } = await supabase.from('membras').select('signup_id, nome_exibicao').eq('nome', nome).not('signup_id', 'is', null).limit(1).maybeSingle()
+  const exibido = m?.nome_exibicao || nome
   if (m?.signup_id) {
     const { data: w } = await supabase.from('whatsapp_membros').select('jid').eq('signup_id', m.signup_id).is('removido_em', null).maybeSingle()
     if (w) return { texto: `*${exibido}* (@${w.jid.replace(/\D/g, '')})`, mention: w.jid }
