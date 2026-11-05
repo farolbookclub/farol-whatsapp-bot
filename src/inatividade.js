@@ -362,7 +362,8 @@ export async function confirmarRemocaoPorCodigo(sock, codigo) {
 
   const { data: config } = await supabase.from('bot_config').select('dias_limite').eq('id', 1).single()
   const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid, nome').eq('ativo', true)
-  const nome = m.signups?.apelido || m.signups?.nome || 'ela'
+  const nomeDe = await nomesExibicaoPorSignup([m.signup_id])
+  const nome = nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome || 'ela')
   const resultado = await remover(sock, m.jid, m.signup_id, grupos ?? [], config?.dias_limite ?? 30, hojeSP())
   await supabase.from('whatsapp_inatividade_log').insert({
     jid: m.jid, signup_id: m.signup_id, data_referencia: hojeSP(), modo: 'real', resultado: `aprovada pela admin; ${resultado}`,
@@ -374,7 +375,7 @@ export async function confirmarRemocaoPorCodigo(sock, codigo) {
 export async function adiarRemocaoPorCodigo(codigo, dias) {
   const { data: m } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signups (apelido, nome)')
+    .select('jid, signup_id, signups (apelido, nome)')
     .eq('remocao_codigo', codigo.toUpperCase())
     .is('removido_em', null)
     .maybeSingle()
@@ -387,7 +388,8 @@ export async function adiarRemocaoPorCodigo(codigo, dias) {
   await supabase.from('whatsapp_membros')
     .update({ remocao_adiada_ate: adiadaAte, remocao_pedida_em: null, remocao_codigo: null })
     .eq('jid', m.jid)
-  return { nome: m.signups?.apelido || m.signups?.nome || 'ela', ate: adiadaAte }
+  const nomeDe = await nomesExibicaoPorSignup([m.signup_id])
+  return { nome: nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome || 'ela'), ate: adiadaAte }
 }
 
 // Roda 1x por dia (controlado por bot_config.inatividade_checada_em_whatsapp).
@@ -468,6 +470,8 @@ export async function processarInatividadeDiaria(sock) {
     return
   }
 
+  const nomeDe = await nomesExibicaoPorSignup((membros ?? []).map((m) => m.signup_id))
+
   const logs = []
   for (const m of membros ?? []) {
     const numero = numeroDoJid(m.jid)
@@ -505,7 +509,7 @@ export async function processarInatividadeDiaria(sock) {
         logs.push({ ...base, resultado: 'erro: admin_jid_whatsapp não configurado' })
         continue
       }
-      const nome = m.signups?.apelido || m.signups?.nome || 'ela'
+      const nome = nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome || 'ela')
       logs.push({ ...base, resultado: await pedirAprovacaoRemocao(sock, config.admin_jid_whatsapp, m, nome, dias) })
       continue
     }

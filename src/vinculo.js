@@ -2,6 +2,16 @@ import { supabase } from './supabase.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Quem aparece de verdade é sempre o "Nome ou apelido de exibição"
+// (membras.nome_exibicao, igual no site) — nunca o apelido/nome crus do
+// cadastro. fallback é usado só se ainda não tiver membra (ou nome_exibicao
+// vazio) — ex.: no primeiro contato, antes do vínculo terminar.
+export async function nomeExibicaoDoSignup(signupId, fallback) {
+  if (!signupId) return fallback
+  const { data } = await supabase.from('membras').select('nome_exibicao').eq('signup_id', signupId).maybeSingle()
+  return data?.nome_exibicao || fallback
+}
+
 // membras.entrou_em é o que o painel admin usa pra mostrar "entrou no
 // grupo" em Integrantes — é separado de whatsapp_membros.entrou_em (que só
 // controla a regra de inatividade). Sem isso, a integrante aparece pra
@@ -51,7 +61,8 @@ export async function vincularConta(jid, token) {
   if (error) throw error
   await marcarEntrouMembras(cadastro.id)
 
-  return { ok: true, apelido: cadastro.apelido || cadastro.nome, formato: cadastro.formato }
+  const apelido = await nomeExibicaoDoSignup(cadastro.id, cadastro.apelido || cadastro.nome)
+  return { ok: true, apelido, formato: cadastro.formato }
 }
 
 export function normalizarNumero(numero) {
@@ -93,7 +104,7 @@ export async function vincularPorNumero(sock, jid) {
             { onConflict: 'jid' },
           )
         await marcarEntrouMembras(c.id)
-        return c
+        return { ...c, apelido: await nomeExibicaoDoSignup(c.id, c.apelido || c.nome) }
       }
     } catch (erro) {
       console.error('vincularPorNumero:', erro)
@@ -130,14 +141,17 @@ export async function desvincularECancelar(jid, signupId, motivo) {
     .neq('status', 'cancelado')
 }
 
-// A inscrição aprovada ligada a esse jid (ou null).
+// A inscrição aprovada ligada a esse jid (ou null). "apelido" já vem
+// resolvido pro nome de exibição (membras.nome_exibicao) — quem usar esse
+// campo já pega o nome certo sem precisar saber dessa regra.
 export async function inscricaoDoJid(jid) {
   const { data } = await supabase
     .from('whatsapp_membros')
-    .select('signups (status, apelido, nome, formato, revisao_manual)')
+    .select('signup_id, signups (status, apelido, nome, formato, revisao_manual)')
     .eq('jid', jid)
     .is('removido_em', null)
     .maybeSingle()
   const s = data?.signups
-  return s?.status === 'aprovado' ? s : null
+  if (s?.status !== 'aprovado') return null
+  return { ...s, apelido: await nomeExibicaoDoSignup(data.signup_id, s.apelido || s.nome) }
 }
