@@ -338,6 +338,9 @@ async function connectToWhatsApp() {
       } catch (erro) {
         console.error('processar pendentes:', erro)
       }
+      // Roda já na conexão (não só depois de 30 min do setInterval) — senão,
+      // num reinício, parabéns/inatividade do dia ficam esperando à toa.
+      processarInatividadeDiaria(sock).catch((erro) => console.error('processar inatividade (inicial):', erro))
     }
   })
 
