@@ -407,10 +407,9 @@ export async function processarInatividadeDiaria(sock) {
   // hoje" (uma por tipo) — por isso ficam ANTES do corte de
   // inatividade_checada_em_whatsapp (ver mais abaixo): senão, num dia em que
   // a checagem de inatividade já rodasse de madrugada (antes das 10h), os
-  // parabéns nunca mais seriam tentados depois das 10h nesse dia.
-  // Parabéns (pessoal, clube, Farol) só saem a partir das 10h — horário fixo,
-  // pra não depender de quando o bot der a sorte de conferir no dia. Antes
-  // disso, só pula (tenta de novo no próximo ciclo de 30 min).
+  // parabéns nunca mais seriam tentados depois das 10h nesse dia. Só saem a
+  // partir das 10h mesmo — horário fixo, pra não depender de quando o bot dá
+  // a sorte de conferir; antes disso só pula (tenta de novo no próximo ciclo).
   const horaSP = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }).format(new Date()))
   const podeParabenizar = horaSP >= 10
 
