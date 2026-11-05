@@ -387,8 +387,12 @@ export async function processarInatividadeDiaria(sock) {
   if (!config.ativo) return
 
   const hoje = hojeSP()
-  if (config.inatividade_checada_em_whatsapp === hoje) return
 
+  // Parabéns (pessoal, clube, Farol) têm sua própria trava de "já postei
+  // hoje" (uma por tipo) — por isso ficam ANTES do corte de
+  // inatividade_checada_em_whatsapp (ver mais abaixo): senão, num dia em que
+  // a checagem de inatividade já rodasse de madrugada (antes das 10h), os
+  // parabéns nunca mais seriam tentados depois das 10h nesse dia.
   // Parabéns (pessoal, clube, Farol) só saem a partir das 10h — horário fixo,
   // pra não depender de quando o bot der a sorte de conferir no dia. Antes
   // disso, só pula (tenta de novo no próximo ciclo de 30 min).
@@ -417,6 +421,10 @@ export async function processarInatividadeDiaria(sock) {
       console.error('aniversário do Farol (WhatsApp):', erro)
     }
   }
+
+  // Dali pra baixo é só a checagem de inatividade de verdade (mais pesada),
+  // que roda só 1x por dia.
+  if (config.inatividade_checada_em_whatsapp === hoje) return
 
   if (!config.lancamento_em) {
     await supabase.from('bot_config').update({ inatividade_checada_em_whatsapp: hoje }).eq('id', 1)
