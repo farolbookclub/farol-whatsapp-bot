@@ -26,7 +26,7 @@ const GUIA_SPOILER =
   'Antes de comentar algo do livro, diga *SPOILER* + *onde você está* (capítulo ou porcentagem), e escreva o spoiler. \n' +
   'Se for imagem, manda visualização única.'
 
-async function gruposParaEnviar(formato) {
+export async function gruposParaEnviar(formato) {
   const topicos = ['bate_papo', 'leitura', 'avisos']
   if (formato === 'presencial') topicos.push('presencial')
   const { data } = await supabase.from('whatsapp_grupos').select('group_jid, nome, topico').eq('ativo', true).in('topico', topicos)
@@ -61,7 +61,7 @@ async function linhaLink(sock, g) {
 // pela Administração, mas pode ter ficado de fora de algum). Se a checagem
 // falhar, assume que já está dentro — melhor não mandar link à toa do que
 // mandar errado.
-async function grupoTemMembro(sock, groupJid, jid) {
+export async function grupoTemMembro(sock, groupJid, jid) {
   try {
     const metadata = await sock.groupMetadata(groupJid)
     return metadata.participants.some((p) => p.id === jid)

@@ -17,7 +17,7 @@ import { perguntarIA } from './ia.js'
 import { processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
-import { checarCodigoPendente } from './codigo.js'
+import { checarCodigoPendente, checarEnviarCodigoSeCompleta } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
 
@@ -372,6 +372,7 @@ async function connectToWhatsApp() {
           if (jaInscrita) {
             if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, jaInscrita.apelido || jaInscrita.nome, jaInscrita.signup_id)
             await avisarAdminEntrouSaiu('entrou', { apelido: jaInscrita.apelido || jaInscrita.nome, formato: jaInscrita.formato })
+            await checarEnviarCodigoSeCompleta(sock, participantJid, jaInscrita.signup_id, jaInscrita.formato)
             continue
           }
           const encontrada = await vincularPorNumero(sock, participantJid)
@@ -384,6 +385,7 @@ async function connectToWhatsApp() {
               console.error('guia pós-vínculo automático:', erro)
             }
             await avisarAdminEntrouSaiu('entrou', { apelido: nome, formato: encontrada.formato })
+            await checarEnviarCodigoSeCompleta(sock, participantJid, encontrada.id, encontrada.formato)
           }
         }
       } else if (update.action === 'remove' || update.action === 'leave') {

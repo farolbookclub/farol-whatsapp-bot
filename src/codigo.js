@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { gruposParaEnviar, grupoTemMembro } from './guia.js'
 
 // Confere se o código do site mudou (rotação automática semanal ou pedido
 // manual) e ainda não foi postado no Avisos do WhatsApp; posta se precisar.
@@ -22,4 +23,36 @@ export async function checarCodigoPendente(sock) {
   await sock.sendMessage(grupo.group_jid, { text: config.codigo_atual })
 
   await supabase.from('bot_config').update({ codigo_postado_whatsapp_em: new Date().toISOString() }).eq('id', 1)
+}
+
+// Depois que ela está de fato em todos os grupos do formato dela (Avisos,
+// Bate-papo, Leitura do mês, +Presencial se for o caso), manda o código
+// atual no privado — só 1 vez (whatsapp_membros.codigo_enviado). Chamado
+// toda vez que ela entra em mais um grupo; só manda quando falta nenhum.
+export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato) {
+  if (!signupId) return
+  const { data: membro } = await supabase
+    .from('whatsapp_membros')
+    .select('codigo_enviado')
+    .eq('jid', jid)
+    .is('removido_em', null)
+    .maybeSingle()
+  if (!membro || membro.codigo_enviado) return
+
+  const grupos = await gruposParaEnviar(formato)
+  if (!grupos.length) return
+  for (const g of grupos) {
+    if (!(await grupoTemMembro(sock, g.group_jid, jid))) return // ainda falta algum
+  }
+
+  const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
+  if (!config?.codigo_atual) return
+
+  try {
+    await sock.sendMessage(jid, { text: `🔑 Código para acessar o site de membras (https://membrosfarol.vercel.app/):` })
+    await sock.sendMessage(jid, { text: config.codigo_atual })
+    await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
+  } catch (erro) {
+    console.error(`enviar código ${jid}:`, erro)
+  }
 }
