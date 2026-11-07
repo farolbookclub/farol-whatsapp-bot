@@ -35,14 +35,13 @@ function maisRecente(...datas) {
 }
 
 function textoLembrete(dias, faltam) {
-  return `Sentimos sua falta por aqui! Já faz ${dias} dias desde sua última interação no Farol. ` +
-    `Se ficar mais ${faltam} ${faltam === 1 ? 'dia' : 'dias'} sem interagir, você será removida dos grupos.`
+  return `Sentimos sua falta! 💕\n` +
+    `Faz ${dias} dias que você não interage no Farol. Com mais ${faltam} dia(s) sem interagir, você sai dos grupos.`
 }
 
 function textoRemocao(limite) {
-  return `Poxa! Você ficou ${limite} dias sem interagir nos grupos do Farol e foi removida. ` +
-    'A intenção da comunidade é criar amizades e conexões através da leitura. ' +
-    `Se desejar voltar, faça uma nova adesão pelo site: ${SITE_URL}`
+  return `Você ficou ${limite} dias sem interagir e foi removida dos grupos do Farol.\n` +
+    `Quer voltar? Faça uma nova adesão: ${SITE_URL}`
 }
 
 function escaparMarcacao(texto) {
@@ -135,8 +134,8 @@ async function aniversarios(sock, hoje) {
     const nomeDe = await nomesExibicaoPorSignup(aniversariantes.map((m) => m.signup_id))
     const pessoas = aniversariantes.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups.apelido || m.signups.nome))}* (@${numeroDoJid(m.jid)})`)
     const texto = aniversariantes.length === 1
-      ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉 Parabéns, que seu novo ciclo seja cheio de livros incríveis e momentos lindos! 💕`
-      : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉 Parabéns, que o novo ciclo de vocês seja cheio de livros incríveis e momentos lindos! 💕`
+      ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉\nParabéns! Que seu novo ciclo venha cheio de livros incríveis 💕`
+      : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉\nParabéns! Que o novo ciclo de vocês venha cheio de livros incríveis 💕`
     try {
       await sock.sendMessage(grupoJid, { text: texto, mentions: aniversariantes.map((m) => m.jid) })
     } catch (erro) {
@@ -232,16 +231,15 @@ async function aniversariosClube(sock, hoje) {
     const nomeDe = await nomesExibicaoPorSignup(grupo.map((m) => m.signup_id))
     const ehMeses = marco.includes('mês') || marco.includes('meses')
     const pessoas = grupo.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome))}* (@${numeroDoJid(m.jid)})`)
-    const nomes = grupo.map((m) => escaparMarcacao(nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome)))
     const singular = grupo.length === 1
 
     const texto = singular
-      ? `🎉✨ Hoje é dia de comemorar! A ${pessoas[0]} completa ${marco} de clubinho! 🥳💖\n\n` +
-        `Parabéns, ${nomes[0]}! 🎂🌟 Obrigada por fazer parte dessa história e por estar com a gente! Amamos ter você no nosso Farol e ficamos muito felizes em ter você por aqui! 🫶🏻💖\n\n` +
-        `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`
-      : `🎉✨ Hoje é dia de comemorar! ${listaDisplay(pessoas)} completam ${marco} de clubinho! 🥳💖\n\n` +
-        `Parabéns, ${listaDisplay(nomes)}! 🎂🌟 Obrigada por fazerem parte dessa história e por estarem com a gente! Amamos ter vocês no nosso Farol e ficamos muito felizes em ter vocês por aqui! 🫶🏻💖\n\n` +
-        `Que venham muitos outros ${ehMeses ? 'meses' : 'anos'} brilhando juntinhas! ⚓🌊💫`
+      ? `🎉 A ${pessoas[0]} completa ${marco} de Farol! 🥳\n` +
+        `Parabéns e obrigada por estar com a gente 💖\n` +
+        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ⚓`
+      : `🎉 ${listaDisplay(pessoas)} completam ${marco} de Farol! 🥳\n` +
+        `Parabéns e obrigada por estarem com a gente 💖\n` +
+        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ⚓`
 
     try {
       await sock.sendMessage(grupoJid, { text: texto, mentions: grupo.map((m) => m.jid) })
@@ -274,10 +272,10 @@ async function aniversarioFarol(sock, hoje) {
 
   try {
     await sock.sendMessage(grupoJid, {
-      text: `✨ Hoje é dia de comemorar: o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 🎉📚\n\n` +
-        `Desde 15 de agosto de 2024, reunimos divas apaixonadas por livros, compartilhamos leituras e criamos amizades lindas! 💖 Hoje somos ${count ?? 0} integrantes, e cada uma de vocês faz parte dessa história.\n\n` +
-        'Obrigada por estarem aqui e fazerem do nosso Farol um lugar tão especial! Que venham muitos outros anos de leituras, histórias, conversas, amizades e momentos incríveis juntas! 🫶🏻⚓🌊\n\n' +
-        'Com carinho,\n*Farol Book Club* ✨💖',
+      text: `✨ Hoje o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 🎉📚\n\n` +
+        `Desde 15/08/2024, já somos ${count ?? 0} integrantes lendo, trocando ideias e fazendo amizades 💖\n\n` +
+        'Obrigada por fazerem do Farol esse lugar especial! 🫶🏻⚓\n' +
+        '*Farol Book Club*',
     })
   } catch (erro) {
     console.error('aniversário do Farol:', erro)
@@ -332,8 +330,8 @@ function gerarCodigo() {
 }
 
 function textoAprovacao(nome, dias, codigo) {
-  return `⚠️ *Remoção por inatividade*\n\n*${nome}* está há ${dias} dias sem interagir e já recebeu o lembrete — pelas regras, seria removida agora.\n\n` +
-    `Responda aqui no meu privado:\n• *!aprovar ${codigo}* — remove agora\n• *!adiar ${codigo} <dias>* — adia por esses dias (ex: !adiar ${codigo} 7)`
+  return `⚠️ *Remoção por inatividade*\n\n*${nome}* está há ${dias} dias sem interagir e já recebeu o lembrete. Pelas regras, seria removida agora.\n\n` +
+    `Responda aqui:\n• *!aprovar ${codigo}*: remove agora\n• *!adiar ${codigo} <dias>*: adia (ex: !adiar ${codigo} 7)`
 }
 
 // Pede aprovação da admin em vez de remover direto. Só manda de novo depois

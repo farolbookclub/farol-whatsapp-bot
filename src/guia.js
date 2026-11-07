@@ -2,7 +2,7 @@ import fs from 'fs'
 import { supabase } from './supabase.js'
 
 const SITE_URL = 'https://biofarol.vercel.app'
-const OK = '\n\nResponda _Ok_ para prosseguir'
+const OK = '\n\nResponda _Ok_ para continuar'
 // Fotos dos grupos (uma pra Presencial, outra pra Online), salvas localmente
 // no celular — não entram no repositório (tem número/nome de gente real).
 const FOTO_GRUPOS_PRESENCIAL = new URL('../assets/grupos-presencial.png', import.meta.url)
@@ -12,19 +12,19 @@ const FOTO_SITE_MEMBRAS = new URL('../assets/site-membras.jpg', import.meta.url)
 
 const GUIA_SITE =
   '✨ *Site das membras:* https://membrosfarol.vercel.app/\n' +
-  '```🔑 O código está fixado em Avisos.```\n\n' +
-  '📲 Toque no ícone de download (circulado de amarelo no print) para instalar o Farol no celular 💕\n\n' +
-  '* 📖 *Leitura do mês*: veja o livro atual e seus gatilhos de conteúdo.\n' +
-  '* 📖 *Leitura extra*: veja nossa leitura extra (se houver) e seus gatilhos de conteúdo.\n' +
-  '* 📚 *Progresso*: registre sua leitura, deixe comentários, dê notas e favorite/abandone livros.\n' +
-  '* 🗂️ *Histórico*: onde fica seu progresso e os comentários das meninas (⚠️ pode conter spoilers).\n' +
-  '* 💌 *Clubinho*: onde você pode enviar sugestões, feedbacks ou denúncias.\n' +
-  '* 🔎 *E mais*: regras, livros anteriores, encontrinhos, membras, ferramentas, arquivos e parceiros!'
+  '🔑 Você recebe o código aqui, assim que entrar nos grupos (os links vêm logo a seguir).\n' +
+  '📲 Toque no ícone de download (circulado no print) para instalar no celular.\n\n' +
+  'No site você:\n' +
+  '📖 vê o livro do mês, a leitura extra e os gatilhos\n' +
+  '📚 registra seu progresso e dá nota\n' +
+  '🗂️ vê o histórico (⚠️ pode ter spoiler)\n' +
+  '💌 envia sugestões e denúncias no *Clubinho*\n' +
+  '🔎 acha regras, encontrinhos, membras e mais'
 
 const GUIA_SPOILER =
-  '*🤫 Spoiler*\n' +
-  'Antes de comentar algo do livro, diga *SPOILER* + *onde você está* (capítulo ou porcentagem), e escreva o spoiler. \n' +
-  'Se for imagem, manda visualização única.'
+  '🤫 *Spoiler*\n' +
+  'Antes de comentar o livro, escreva *SPOILER* + onde você está (capítulo ou %). Depois, o spoiler.\n' +
+  'Imagem? Envie em visualização única.'
 
 export async function gruposParaEnviar(formato) {
   const topicos = ['bate_papo', 'leitura', 'avisos']
@@ -37,9 +37,9 @@ export async function gruposParaEnviar(formato) {
 // banco — é só como aparece pra quem está entrando nos grupos).
 const ROTULO_TOPICO = {
   avisos: '*Comunidade*',
-  bate_papo: '💬 *| Bate-papo:*',
-  leitura: '📖 *| Leitura do mês:*',
-  presencial: '☕ *| Presencial:*',
+  bate_papo: '💬 *Bate-papo:*',
+  leitura: '📖 *Leitura do mês:*',
+  presencial: '☕ *Presencial:*',
 }
 const ORDEM_TOPICOS = ['avisos', 'bate_papo', 'leitura', 'presencial']
 
@@ -72,8 +72,8 @@ export async function grupoTemMembro(sock, groupJid, jid) {
 }
 
 const COMANDOS_PV =
-  'Se precisar de ajuda, pode me mandar aqui no privado:\n' +
-  '/duvida + sua pergunta — tento te ajudar! Se eu não souber, te mando perguntar no grupo Bate-papo mencionando a Kah, ou chamar ela no privado 💖'
+  'Dúvida? Mande aqui: */duvida* + sua pergunta.\n' +
+  'Se eu não souber, pergunte no Bate-papo marcando a Kah 💖'
 
 // Última etapa do guia: confere de verdade (via groupMetadata) em quais
 // grupos a pessoa já está — manda link só do que realmente falta entrar,
@@ -81,7 +81,7 @@ const COMANDOS_PV =
 async function finalizarGuia(sock, jid, formato) {
   const grupos = await gruposParaEnviar(formato)
   if (!grupos.length) {
-    await sock.sendMessage(jid, { text: 'Ainda não tenho os grupos configurados — chama a Administração 💖' })
+    await sock.sendMessage(jid, { text: 'Os grupos ainda não estão configurados. Chame a Administração 💖' })
     return
   }
   const emOrdem = emOrdemDeTopico(grupos)
@@ -93,8 +93,8 @@ async function finalizarGuia(sock, jid, formato) {
 
   if (!faltando.length) {
     await sock.sendMessage(jid, {
-      text: 'Vi que você já está em todos os grupos — seja bem-vinda! 💖\n\n' +
-        'Se ainda não se apresentou, pode fazer isso no *Bate-papo*: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas 📚\n\n' +
+      text: 'Você já está em todos os grupos. Bem-vinda! 💖\n\n' +
+        'Ainda não se apresentou? Faça isso no *Bate-papo*: nome, cidade, livro favorito, pets e hobbies 📚\n\n' +
         COMANDOS_PV,
     })
     return
@@ -102,8 +102,8 @@ async function finalizarGuia(sock, jid, formato) {
 
   const faltaTudo = faltando.length === emOrdem.length
   let texto = faltaTudo
-    ? 'Agora é só entrar nos grupos (toca em cada link e pede pra entrar):\n\n'
-    : 'Vi que você já está em alguns grupos — só falta entrar em:\n\n'
+    ? 'Entre nos grupos (toque no link e peça para entrar):\n\n'
+    : 'Falta entrar em:\n\n'
   for (const g of faltando) {
     texto += await linhaLink(sock, g)
   }
@@ -115,8 +115,8 @@ async function finalizarGuia(sock, jid, formato) {
 // jaNosGrupos: true pra quem já foi adicionada direto nos grupos pela
 // Administração (não precisa do link no final, só do guia mesmo).
 export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
-  const fim = jaNosGrupos ? 'Vou te mandar um guia do clube 💕' : 'Vou te mandar um guia do clube antes de você entrar 💕'
-  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}, tudo bem? Aqui é o *Faroleiro*, o *robô* do *Farol* 💖\n${fim}${OK}`
+  const fim = jaNosGrupos ? 'Vou te mandar um guia rapidinho 💕' : 'Antes de entrar, vou te mandar um guia rapidinho 💕'
+  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}! Eu sou o *Faroleiro*, o robô do *Farol* 💖\n${fim}${OK}`
   await sock.sendMessage(jid, { text: texto })
 }
 
@@ -138,16 +138,16 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   if (etapa === 1) {
     const presencial = formato === 'presencial'
     const texto2 = presencial
-      ? 'Nossa comunidade é composta por esses grupos:\n\n' +
-        '* 📢 *Avisos* (recados da administração)\n' +
-        '* 💬 *Bate-papo* (falamos de tudo um pouco)\n' +
-        '* 📚 *Leitura do mês* (falamos sobre a nossa leitura atual)\n' +
-        '* ☕ *Presencial* (oculto para o resto da comunidade)' +
+      ? 'Nossos grupos:\n\n' +
+        '📢 *Avisos*: recados da Administração\n' +
+        '💬 *Bate-papo*: conversa livre\n' +
+        '📚 *Leitura do mês*: o livro atual\n' +
+        '☕ *Presencial*: só para quem participa' +
         OK
-      : 'Nossa comunidade é composta por esses grupos:\n\n' +
-        '* 📢 *Avisos* (recados da administração)\n' +
-        '* 💬 *Bate-papo* (falamos de tudo um pouco)\n' +
-        '* 📚 *Leitura do mês* (falamos sobre a nossa leitura atual)' +
+      : 'Nossos grupos:\n\n' +
+        '📢 *Avisos*: recados da Administração\n' +
+        '💬 *Bate-papo*: conversa livre\n' +
+        '📚 *Leitura do mês*: o livro atual' +
         OK
     // Manda a foto dos grupos certa pro formato (se o arquivo existir no
     // celular) com esse texto de legenda; senão, cai pro texto puro.

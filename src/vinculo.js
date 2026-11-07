@@ -45,19 +45,19 @@ export async function vincularConta(jid, token) {
     .eq('confirmation_token', token)
     .maybeSingle()
   if (erroCadastro) console.error('vincularConta (buscar signup):', erroCadastro.message, erroCadastro.code)
-  if (!cadastro) return { ok: false, texto: 'Esse link não é válido. Abra de novo a página Minha inscrição e use o botão de lá.' }
+  if (!cadastro) return { ok: false, texto: 'Link inválido. Abra *Minha inscrição* e use o botão de lá.' }
   if (cadastro.status !== 'aprovado') {
     return {
       ok: false,
       texto: cadastro.status === 'cancelado'
-        ? 'Essa inscrição foi cancelada. Pra voltar, faça uma nova adesão pelo site do Farol.'
-        : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e depois use o botão de novo.',
+        ? 'Sua inscrição foi cancelada. Para voltar, faça uma nova adesão no site do Farol.'
+        : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e toque no botão de novo.',
     }
   }
 
   const { data: jaVinculado } = await supabase.from('whatsapp_membros').select('jid').eq('signup_id', cadastro.id).maybeSingle()
   if (jaVinculado && jaVinculado.jid !== jid) {
-    return { ok: false, texto: 'Esse link já foi usado por outro número. Se trocou de número, chame a Administração.' }
+    return { ok: false, texto: 'Esse link já foi usado em outro número. Trocou de número? Fale com a Administração.' }
   }
 
   // removido_em explícito: se esse número já foi removido antes, o upsert

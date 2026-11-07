@@ -21,7 +21,7 @@ import { checarCodigoPendente, checarEnviarCodigoSeCompleta } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
 
-const AJUDA_COMANDOS = '/duvida + sua pergunta — tento te ajudar 💖'
+const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖'
 
 // Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
 let sockAtual = null
@@ -39,11 +39,9 @@ function textoDaMensagem(m) {
 async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome, signupId) {
   try {
     const apresentacao = await apresentacaoDoSignup(signupId)
-    const miolo = apresentacao
-      ? `Estamos felizes em ter você conosco 🥹 apresentação:\n_${apresentacao}_`
-      : 'Estamos felizes em ter você conosco 🥹, se quiser fique a vontade para se apresentar! 💖'
+    const miolo = apresentacao ? `Apresentação:\n_${apresentacao}_` : 'Fique à vontade para se apresentar! 💖'
     await sock.sendMessage(groupJid, {
-      text: `Seja bem-vinda *${nome}* (@${participantJid.split('@')[0].split(':')[0]}) ao Farol! 🎉 ${miolo}`,
+      text: `Bem-vinda, *${nome}* (@${participantJid.split('@')[0].split(':')[0]})! 🎉 Que bom ter você no Farol 🥹\n${miolo}`,
       mentions: [participantJid],
     })
   } catch (erro) {
@@ -76,7 +74,7 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'approve')
     try {
       const meta = await sock.groupMetadata(groupJid)
-      await sock.sendMessage(participantJid, { text: `Pronto, você entrou no ${meta.subject}! 🎉 Seja bem-vinda 💖` })
+      await sock.sendMessage(participantJid, { text: `Pronto, você entrou no ${meta.subject}! 🎉 Bem-vinda 💖` })
     } catch (erro) {
       console.error('aviso de entrada:', erro)
     }
@@ -87,7 +85,7 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
     // formato errado (ex: online tentando entrar no grupo Presencial).
     if (inscricao) {
       try {
-        await sock.sendMessage(participantJid, { text: 'Esse grupo é só para quem participa do Farol Presencial.' })
+        await sock.sendMessage(participantJid, { text: 'Esse grupo é só para o Farol Presencial.' })
       } catch (erro) {
         console.error('aviso de recusa:', erro)
       }
@@ -163,7 +161,7 @@ async function handleGroupMessage(sock, m, groupJid) {
       console.error('apagar spoiler:', erro)
     }
     await guardarSpoiler({ groupJid, topico, apelido, texto })
-    await sock.sendMessage(groupJid, { text: `🤫 ${apelido} comentou algo com spoiler (removido daqui). Quer ver? Manda /spoiler no meu privado 💬` })
+    await sock.sendMessage(groupJid, { text: `🤫 ${apelido} comentou um spoiler sem avisar. Apaguei a mensagem.` })
     return
   }
 
@@ -202,7 +200,7 @@ async function handleDM(sock, m, jid) {
     const { data: atual } = await supabase.from('bot_config').select('admin_jid_whatsapp').eq('id', 1).maybeSingle()
     if (atual?.admin_jid_whatsapp) return
     await supabase.from('bot_config').update({ admin_jid_whatsapp: jid }).eq('id', 1)
-    await sock.sendMessage(jid, { text: 'Prontinho, salvei você como admin pra receber os pedidos de aprovação de remoção 💖' })
+    await sock.sendMessage(jid, { text: 'Pronto, você agora é admin e vai receber os pedidos de remoção 💖' })
     return
   }
 
@@ -213,7 +211,7 @@ async function handleDM(sock, m, jid) {
   if (comandoAprovar) {
     if (!ehAdmin) return
     const nome = await confirmarRemocaoPorCodigo(sock, comandoAprovar[1])
-    await sock.sendMessage(jid, { text: nome ? `Pronto, removi a ${nome} 💔` : 'Não achei nenhum pedido pendente com esse código.' })
+    await sock.sendMessage(jid, { text: nome ? `Pronto, removi a ${nome} 💔` : 'Não achei pedido pendente com esse código.' })
     return
   }
 
@@ -222,7 +220,7 @@ async function handleDM(sock, m, jid) {
     if (!ehAdmin) return
     const resultado = await adiarRemocaoPorCodigo(comandoAdiar[1], Number(comandoAdiar[2]))
     await sock.sendMessage(jid, {
-      text: resultado ? `Combinado, adiei a remoção da ${resultado.nome} até ${resultado.ate} 💖` : 'Não achei nenhum pedido pendente com esse código.',
+      text: resultado ? `Adiei a remoção da ${resultado.nome} até ${resultado.ate} 💖` : 'Não achei pedido pendente com esse código.',
     })
     return
   }
@@ -259,7 +257,7 @@ async function handleDM(sock, m, jid) {
   }
 
   if (/^\/ajuda$/i.test(texto)) {
-    await sock.sendMessage(jid, { text: `Comandos do Faroleiro:\n\n${AJUDA_COMANDOS}` })
+    await sock.sendMessage(jid, { text: `Comandos:\n${AJUDA_COMANDOS}` })
     return
   }
 

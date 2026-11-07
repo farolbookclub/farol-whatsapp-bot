@@ -18,9 +18,8 @@ export async function checarCodigoPendente(sock) {
   if (!grupo) return
 
   await sock.sendMessage(grupo.group_jid, {
-    text: `🔑 Código para acessar o site de membras (https://membrosfarol.vercel.app/):`,
+    text: `🔑 Código do site de membras:\n*${config.codigo_atual}*\nhttps://membrosfarol.vercel.app/`,
   })
-  await sock.sendMessage(grupo.group_jid, { text: config.codigo_atual })
 
   await supabase.from('bot_config').update({ codigo_postado_whatsapp_em: new Date().toISOString() }).eq('id', 1)
 }
@@ -49,8 +48,7 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
   if (!config?.codigo_atual) return
 
   try {
-    await sock.sendMessage(jid, { text: `🔑 Código para acessar o site de membras (https://membrosfarol.vercel.app/):` })
-    await sock.sendMessage(jid, { text: config.codigo_atual })
+    await sock.sendMessage(jid, { text: `🔑 Código do site de membras:\n*${config.codigo_atual}*\nhttps://membrosfarol.vercel.app/` })
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
   } catch (erro) {
     console.error(`enviar código ${jid}:`, erro)

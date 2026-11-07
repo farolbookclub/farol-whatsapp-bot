@@ -43,7 +43,7 @@ async function textoProgresso(p, livro) {
   let texto = `${quem.texto} ${verbo} *"${livro}"*\n\n`
   texto += `* *${abandono ? 'Parou em' : 'Progresso'}:* ${trechoProgresso(p)}\n`
   if (p.emocoes?.length) texto += `* *Emoções:* ${p.emocoes.join(', ')}\n`
-  if (p.comentario) texto += `* *Comentário*: Confira em ${SITE_MEMBRAS}, pode conter spoiler.\n`
+  if (p.comentario) texto += `* *Comentário:* veja no site (pode ter spoiler): ${SITE_MEMBRAS}\n`
   if (p.fonte === 'maratona') texto += `\n_Fonte: MaratonaApp_`
 
   return { texto: texto.trim(), mention: quem.mention }
@@ -54,8 +54,8 @@ async function textoProgresso(p, livro) {
 async function textoNota(r, livro) {
   const quem = await resolverMencao(r.nome_publico)
   const nota = String(Number(r.rating)).replace('.', ',')
-  let texto = `⭐ ${quem.texto}\navaliou "${livro}": nota ${nota}`
-  if (r.is_favorite) texto += ' — favorito ❤️'
+  let texto = `⭐ ${quem.texto} avaliou "${livro}": nota ${nota}`
+  if (r.is_favorite) texto += ' ❤️'
   return { texto, mention: quem.mention }
 }
 
