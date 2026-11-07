@@ -3,7 +3,7 @@ import pino from 'pino'
 import qrcodeTerminal from 'qrcode-terminal'
 import { grupoAtivo, identificarTopico, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
-import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar } from './vinculo.js'
+import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar, apresentacaoDoSignup } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { iniciarEscutaLeitura } from './avisoLeitura.js'
@@ -33,11 +33,17 @@ function textoDaMensagem(m) {
   return msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption || msg.videoMessage?.caption || ''
 }
 
-// Boas-vindas pública no grupo Bate-papo, mencionando quem entrou.
-async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome) {
+// Boas-vindas pública no grupo Bate-papo, mencionando quem entrou. Se ela já
+// escreveu a apresentação em "Minha inscrição" (no site) antes de entrar,
+// manda junto — senão, convida a se apresentar.
+async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome, signupId) {
   try {
+    const apresentacao = await apresentacaoDoSignup(signupId)
+    const miolo = apresentacao
+      ? `Estamos felizes em ter você conosco 🥹 apresentação:\n_${apresentacao}_`
+      : 'Estamos felizes em ter você conosco 🥹, se quiser fique a vontade para se apresentar! 💖'
     await sock.sendMessage(groupJid, {
-      text: `Seja bem-vinda *${nome}* (@${participantJid.split('@')[0].split(':')[0]}) ao Farol! 🎉 Estamos felizes em ter você conosco 🥹, se quiser fique a vontade para se apresentar! 💖`,
+      text: `Seja bem-vinda *${nome}* (@${participantJid.split('@')[0].split(':')[0]}) ao Farol! 🎉 ${miolo}`,
       mentions: [participantJid],
     })
   } catch (erro) {
@@ -364,14 +370,14 @@ async function connectToWhatsApp() {
         for (const participantJid of update.participants) {
           const jaInscrita = await inscricaoDoJid(participantJid)
           if (jaInscrita) {
-            if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, jaInscrita.apelido || jaInscrita.nome)
+            if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, jaInscrita.apelido || jaInscrita.nome, jaInscrita.signup_id)
             await avisarAdminEntrouSaiu('entrou', { apelido: jaInscrita.apelido || jaInscrita.nome, formato: jaInscrita.formato })
             continue
           }
           const encontrada = await vincularPorNumero(sock, participantJid)
           if (encontrada) {
             const nome = encontrada.apelido || encontrada.nome
-            if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, nome)
+            if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, nome, encontrada.id)
             try {
               await iniciarGuia(sock, participantJid, nome, true)
             } catch (erro) {

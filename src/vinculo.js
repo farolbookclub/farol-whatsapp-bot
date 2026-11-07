@@ -12,6 +12,14 @@ export async function nomeExibicaoDoSignup(signupId, fallback) {
   return data?.nome_exibicao || fallback
 }
 
+// Apresentação que ela já escreveu em "Minha inscrição" (no site), antes
+// mesmo de entrar no grupo — pra incluir nas boas-vindas se tiver.
+export async function apresentacaoDoSignup(signupId) {
+  if (!signupId) return null
+  const { data } = await supabase.from('membras').select('apresentacao').eq('signup_id', signupId).maybeSingle()
+  return data?.apresentacao?.trim() || null
+}
+
 // membras.entrou_em é o que o painel admin usa pra mostrar "entrou no
 // grupo" em Integrantes — é separado de whatsapp_membros.entrou_em (que só
 // controla a regra de inatividade). Sem isso, a integrante aparece pra
@@ -153,5 +161,5 @@ export async function inscricaoDoJid(jid) {
     .maybeSingle()
   const s = data?.signups
   if (s?.status !== 'aprovado') return null
-  return { ...s, apelido: await nomeExibicaoDoSignup(data.signup_id, s.apelido || s.nome) }
+  return { ...s, signup_id: data.signup_id, apelido: await nomeExibicaoDoSignup(data.signup_id, s.apelido || s.nome) }
 }
