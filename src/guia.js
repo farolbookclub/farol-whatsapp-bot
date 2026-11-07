@@ -21,10 +21,14 @@ const GUIA_SITE =
   '💌 envia sugestões e denúncias no *Clubinho*\n' +
   '🔎 acha regras, encontrinhos, membras e mais'
 
+const GUIA_LEITURA =
+  '📚 A leitura do livro do mês já está em andamento. Não temos cronograma: cada uma lê no seu ritmo, até a data do encontro da sua modalidade.\n\n' +
+  'A data e os detalhes estão no site de membras.'
+
 const GUIA_SPOILER =
-  '🤫 *Spoiler*\n' +
-  'Antes de comentar o livro, escreva *SPOILER* + onde você está (capítulo ou %). Depois, o spoiler.\n' +
-  'Imagem? Envie em visualização única.'
+  '💬 *Spoilers e comentários*\n' +
+  'Ao comentar o livro, escreva *SPOILER* + onde você está (capítulo, pág. ou %) e depois o comentário.\n' +
+  'Foto? Envie em visualização única.'
 
 export async function gruposParaEnviar(formato) {
   const topicos = ['bate_papo', 'leitura', 'avisos']
@@ -172,12 +176,18 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   }
 
   if (etapa === 3) {
-    await sock.sendMessage(jid, { text: `${GUIA_SPOILER}${OK}` })
+    await sock.sendMessage(jid, { text: `${GUIA_LEITURA}${OK}` })
     await supabase.from('whatsapp_membros').update({ guia_etapa: 4 }).eq('jid', jid)
     return true
   }
 
   if (etapa === 4) {
+    await sock.sendMessage(jid, { text: `${GUIA_SPOILER}${OK}` })
+    await supabase.from('whatsapp_membros').update({ guia_etapa: 5 }).eq('jid', jid)
+    return true
+  }
+
+  if (etapa === 5) {
     await finalizarGuia(sock, jid, formato)
     await supabase.from('whatsapp_membros').update({ guia_etapa: null }).eq('jid', jid)
     return true
