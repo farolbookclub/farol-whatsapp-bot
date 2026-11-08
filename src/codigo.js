@@ -32,16 +32,17 @@ export async function checarCodigoPendente(sock) {
 // Depois que ela está de fato em todos os grupos do formato dela (Avisos,
 // Bate-papo, Leitura do mês, +Presencial se for o caso), manda a mensagem
 // oficial de boas-vindas + código no privado — só 1 vez (codigo_enviado).
-// Chamado toda vez que ela entra em mais um grupo, pra responder na hora
-// quando completa (sem esperar a varredura periódica). Se ainda não
-// completou, não faz nada aqui — quem cuida de marcar/lembrar quem ficou
-// incompleta é a varredura periódica (revisarMembrosIncompletos), que
-// também cobre quem já estava parada antes dessa checagem existir.
+// Chamado toda vez que ela entra em mais um grupo. Enquanto ainda falta
+// algum, guarda desde quando está incompleta (grupos_incompletos_desde) —
+// é esse marcador que diz pra revisarMembrosIncompletos quem ela deve
+// acompanhar. Sem essa marca, a varredura periódica nunca mexe em ninguém
+// (importante: evita reprocessar/mandar mensagem pra gente antiga que
+// nunca passou por aqui).
 export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato) {
   if (!signupId) return
   const { data: membro } = await supabase
     .from('whatsapp_membros')
-    .select('codigo_enviado')
+    .select('codigo_enviado, grupos_incompletos_desde')
     .eq('jid', jid)
     .is('removido_em', null)
     .maybeSingle()
@@ -50,7 +51,12 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
   const grupos = await gruposParaEnviar(formato)
   if (!grupos.length) return
   for (const g of grupos) {
-    if (!(await grupoTemMembro(sock, g.group_jid, jid))) return // ainda falta algum
+    if (!(await grupoTemMembro(sock, g.group_jid, jid))) {
+      if (!membro.grupos_incompletos_desde) {
+        await supabase.from('whatsapp_membros').update({ grupos_incompletos_desde: new Date().toISOString() }).eq('jid', jid)
+      }
+      return // ainda falta algum
+    }
   }
 
   const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
@@ -91,13 +97,12 @@ export async function responderPedidoCodigo(sock, jid, signupId, formato) {
   }
 }
 
-// Varredura periódica de quem ainda não recebeu o código (codigo_enviado
-// ainda false, conta ativa). Pra cada uma, confere de verdade na hora:
-//   - já completou tudo? manda a mensagem oficial agora (cobre quem foi
-//     adicionada direto ou passou batido no evento, como quem já estava
-//     parada antes dessa checagem existir);
-//   - ainda falta grupo e é a 1ª vez que detecta isso? só marca
-//     grupos_incompletos_desde (começa a contar a 1h a partir de agora);
+// Varredura periódica — SÓ mexe em quem já foi marcada como incompleta de
+// verdade (grupos_incompletos_desde preenchido por checarEnviarCodigoSeCompleta,
+// num evento real de entrada em grupo). Nunca varre quem não tem essa marca,
+// pra não reprocessar/mandar mensagem indevida pra gente antiga. Pra cada
+// uma marcada, confere de novo na hora:
+//   - já completou tudo nesse meio-tempo? manda a mensagem oficial agora;
 //   - já passou 1h desde que foi marcada e ainda não mandou lembrete?
 //     manda o lembrete (1x só) com o link do que falta.
 export async function revisarMembrosIncompletos(sock) {
@@ -106,6 +111,7 @@ export async function revisarMembrosIncompletos(sock) {
     .select('jid, signup_id, grupos_incompletos_desde, lembrete_grupos_enviado_em, signups (formato)')
     .is('removido_em', null)
     .eq('codigo_enviado', false)
+    .not('grupos_incompletos_desde', 'is', null)
   if (!membros?.length) return
 
   const umaHoraAtras = Date.now() - 60 * 60 * 1000
@@ -124,11 +130,6 @@ export async function revisarMembrosIncompletos(sock) {
         await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, '🔑 Código do site de membras:')
         await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', m.jid)
         continue
-      }
-
-      if (!m.grupos_incompletos_desde) {
-        await supabase.from('whatsapp_membros').update({ grupos_incompletos_desde: new Date().toISOString() }).eq('jid', m.jid)
-        continue // começa a contar agora; lembrete só daqui a 1h
       }
 
       if (m.lembrete_grupos_enviado_em) continue // já lembrou, não repete
