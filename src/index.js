@@ -354,6 +354,8 @@ async function connectToWhatsApp() {
       // Roda já na conexão (não só depois de 30 min do setInterval) — senão,
       // num reinício, parabéns/inatividade do dia ficam esperando à toa.
       processarInatividadeDiaria(sock).catch((erro) => console.error('processar inatividade (inicial):', erro))
+      // Mesma lógica: roda já na conexão, não só depois de 15 min do setInterval.
+      revisarMembrosIncompletos(sock).catch((erro) => console.error('revisar membros incompletas (inicial):', erro))
     }
   })
 
