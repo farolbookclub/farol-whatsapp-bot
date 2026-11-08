@@ -17,7 +17,7 @@ import { perguntarIA } from './ia.js'
 import { processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
-import { checarCodigoPendente, checarEnviarCodigoSeCompleta, responderPedidoCodigo, lembrarGruposIncompletos } from './codigo.js'
+import { checarCodigoPendente, checarEnviarCodigoSeCompleta, responderPedidoCodigo, revisarMembrosIncompletos } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
 
@@ -524,10 +524,11 @@ setInterval(() => {
   if (sockAtual) processarInatividadeDiaria(sockAtual).catch((e) => console.error('processar inatividade:', e))
 }, 30 * 60 * 1000)
 
-// Lembrete de grupo incompleto (1h depois de detectar que falta algum):
-// checa a cada 15 min; a própria função só manda 1x por pessoa.
+// Revisão de membros incompletas: confere quem ainda não recebeu o código,
+// manda na hora pra quem já completou (passou batido) e, pra quem ainda
+// falta grupo, marca/lembra depois de 1h. Checa a cada 15 min.
 setInterval(() => {
-  if (sockAtual) lembrarGruposIncompletos(sockAtual).catch((e) => console.error('lembrar grupos incompletos:', e))
+  if (sockAtual) revisarMembrosIncompletos(sockAtual).catch((e) => console.error('revisar membros incompletas:', e))
 }, 15 * 60 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)

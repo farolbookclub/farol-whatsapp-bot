@@ -32,14 +32,16 @@ export async function checarCodigoPendente(sock) {
 // Depois que ela está de fato em todos os grupos do formato dela (Avisos,
 // Bate-papo, Leitura do mês, +Presencial se for o caso), manda a mensagem
 // oficial de boas-vindas + código no privado — só 1 vez (codigo_enviado).
-// Chamado toda vez que ela entra em mais um grupo. Enquanto ainda falta
-// algum grupo, guarda desde quando está incompleta (grupos_incompletos_desde),
-// pra depois o lembrete de 1h saber quem avisar.
+// Chamado toda vez que ela entra em mais um grupo, pra responder na hora
+// quando completa (sem esperar a varredura periódica). Se ainda não
+// completou, não faz nada aqui — quem cuida de marcar/lembrar quem ficou
+// incompleta é a varredura periódica (revisarMembrosIncompletos), que
+// também cobre quem já estava parada antes dessa checagem existir.
 export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato) {
   if (!signupId) return
   const { data: membro } = await supabase
     .from('whatsapp_membros')
-    .select('codigo_enviado, grupos_incompletos_desde')
+    .select('codigo_enviado')
     .eq('jid', jid)
     .is('removido_em', null)
     .maybeSingle()
@@ -48,12 +50,7 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
   const grupos = await gruposParaEnviar(formato)
   if (!grupos.length) return
   for (const g of grupos) {
-    if (!(await grupoTemMembro(sock, g.group_jid, jid))) {
-      if (!membro.grupos_incompletos_desde) {
-        await supabase.from('whatsapp_membros').update({ grupos_incompletos_desde: new Date().toISOString() }).eq('jid', jid)
-      }
-      return // ainda falta algum
-    }
+    if (!(await grupoTemMembro(sock, g.group_jid, jid))) return // ainda falta algum
   }
 
   const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
@@ -94,32 +91,55 @@ export async function responderPedidoCodigo(sock, jid, signupId, formato) {
   }
 }
 
-// Lembrete único, 1h depois de detectar que ela entrou em algum grupo mas
-// ainda não em todos: avisa o que falta, com o link só do que falta.
-export async function lembrarGruposIncompletos(sock) {
-  const umaHoraAtras = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+// Varredura periódica de quem ainda não recebeu o código (codigo_enviado
+// ainda false, conta ativa). Pra cada uma, confere de verdade na hora:
+//   - já completou tudo? manda a mensagem oficial agora (cobre quem foi
+//     adicionada direto ou passou batido no evento, como quem já estava
+//     parada antes dessa checagem existir);
+//   - ainda falta grupo e é a 1ª vez que detecta isso? só marca
+//     grupos_incompletos_desde (começa a contar a 1h a partir de agora);
+//   - já passou 1h desde que foi marcada e ainda não mandou lembrete?
+//     manda o lembrete (1x só) com o link do que falta.
+export async function revisarMembrosIncompletos(sock) {
   const { data: membros } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signup_id, signups (formato)')
+    .select('jid, signup_id, grupos_incompletos_desde, lembrete_grupos_enviado_em, signups (formato)')
     .is('removido_em', null)
     .eq('codigo_enviado', false)
-    .is('lembrete_grupos_enviado_em', null)
-    .not('grupos_incompletos_desde', 'is', null)
-    .lte('grupos_incompletos_desde', umaHoraAtras)
   if (!membros?.length) return
+
+  const umaHoraAtras = Date.now() - 60 * 60 * 1000
 
   for (const m of membros) {
     const formato = m.signups?.formato
-    if (!formato) continue
+    if (!formato || !m.signup_id) continue
     try {
       const r = await gruposFaltandoTexto(sock, m.jid, formato)
-      if (!r.configurado || r.completo) continue // mudou de estado nesse meio-tempo
+      if (!r.configurado) continue
+
+      if (r.completo) {
+        const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
+        if (!config?.codigo_atual) continue
+        await sock.sendMessage(m.jid, { text: 'Pronto, você está oficialmente no Farol! 🎉 Bem-vinda 💖' })
+        await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, '🔑 Código do site de membras:')
+        await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', m.jid)
+        continue
+      }
+
+      if (!m.grupos_incompletos_desde) {
+        await supabase.from('whatsapp_membros').update({ grupos_incompletos_desde: new Date().toISOString() }).eq('jid', m.jid)
+        continue // começa a contar agora; lembrete só daqui a 1h
+      }
+
+      if (m.lembrete_grupos_enviado_em) continue // já lembrou, não repete
+      if (new Date(m.grupos_incompletos_desde).getTime() > umaHoraAtras) continue // ainda não faz 1h
+
       await sock.sendMessage(m.jid, {
         text: `Verifiquei aqui e ainda falta você entrar em:\n\n${r.links}\npra você estar oficialmente no clube 💖`,
       })
       await supabase.from('whatsapp_membros').update({ lembrete_grupos_enviado_em: new Date().toISOString() }).eq('jid', m.jid)
     } catch (erro) {
-      console.error(`lembrete de grupos ${m.jid}:`, erro)
+      console.error(`revisar membro incompleto ${m.jid}:`, erro)
     }
   }
 }
