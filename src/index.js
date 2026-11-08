@@ -1,6 +1,7 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys'
 import pino from 'pino'
 import qrcodeTerminal from 'qrcode-terminal'
+import { enviarMsg, limparEnviosAntigos } from './envio.js'
 import { grupoAtivo, identificarTopico, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar, apresentacaoDoSignup } from './vinculo.js'
@@ -12,7 +13,7 @@ import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
 import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
-import { iniciarGuia, tentarAvancarGuia } from './guia.js'
+import { iniciarGuia, tentarAvancarGuia, checarPrazoLinks } from './guia.js'
 import { perguntarIA } from './ia.js'
 import { processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
@@ -40,7 +41,7 @@ async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome, signu
   try {
     const apresentacao = await apresentacaoDoSignup(signupId)
     const miolo = apresentacao ? `Apresentação:\n_${apresentacao}_` : 'Fique à vontade para se apresentar! 💖'
-    await sock.sendMessage(groupJid, {
+    await enviarMsg(sock, groupJid, {
       text: `Bem-vinda, *${nome}* (@${participantJid.split('@')[0].split(':')[0]})! 🎉 Que bom ter você no Farol 🥹\n${miolo}`,
       mentions: [participantJid],
     })
@@ -82,7 +83,7 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
     // formato errado (ex: online tentando entrar no grupo Presencial).
     if (inscricao) {
       try {
-        await sock.sendMessage(participantJid, { text: 'Esse grupo é só para o Farol Presencial.' })
+        await enviarMsg(sock, participantJid, { text: 'Esse grupo é só para o Farol Presencial.' })
       } catch (erro) {
         console.error('aviso de recusa:', erro)
       }
@@ -158,7 +159,7 @@ async function handleGroupMessage(sock, m, groupJid) {
       console.error('apagar spoiler:', erro)
     }
     await guardarSpoiler({ groupJid, topico, apelido, texto })
-    await sock.sendMessage(groupJid, { text: `🤫 ${apelido} comentou um spoiler sem avisar. Apaguei a mensagem.` })
+    await enviarMsg(sock, groupJid, { text: `🤫 ${apelido} comentou um spoiler sem avisar. Apaguei a mensagem.` })
     return
   }
 
@@ -197,7 +198,7 @@ async function handleDM(sock, m, jid) {
     const { data: atual } = await supabase.from('bot_config').select('admin_jid_whatsapp').eq('id', 1).maybeSingle()
     if (atual?.admin_jid_whatsapp) return
     await supabase.from('bot_config').update({ admin_jid_whatsapp: jid }).eq('id', 1)
-    await sock.sendMessage(jid, { text: 'Pronto, você agora é admin e vai receber os pedidos de remoção 💖' })
+    await enviarMsg(sock, jid, { text: 'Pronto, você agora é admin e vai receber os pedidos de remoção 💖' })
     return
   }
 
@@ -208,7 +209,7 @@ async function handleDM(sock, m, jid) {
   if (comandoAprovar) {
     if (!ehAdmin) return
     const nome = await confirmarRemocaoPorCodigo(sock, comandoAprovar[1])
-    await sock.sendMessage(jid, { text: nome ? `Pronto, removi a ${nome} 💔` : 'Não achei pedido pendente com esse código.' })
+    await enviarMsg(sock, jid, { text: nome ? `Pronto, removi a ${nome} 💔` : 'Não achei pedido pendente com esse código.' })
     return
   }
 
@@ -216,7 +217,7 @@ async function handleDM(sock, m, jid) {
   if (comandoAdiar) {
     if (!ehAdmin) return
     const resultado = await adiarRemocaoPorCodigo(comandoAdiar[1], Number(comandoAdiar[2]))
-    await sock.sendMessage(jid, {
+    await enviarMsg(sock, jid, {
       text: resultado ? `Adiei a remoção da ${resultado.nome} até ${resultado.ate} 💖` : 'Não achei pedido pendente com esse código.',
     })
     return
@@ -227,7 +228,7 @@ async function handleDM(sock, m, jid) {
     const resultado = await vincularConta(jid, comandoStart[1])
     if (!resultado) return
     if (!resultado.ok) {
-      await sock.sendMessage(jid, { text: resultado.texto })
+      await enviarMsg(sock, jid, { text: resultado.texto })
       return
     }
     await iniciarGuia(sock, jid, resultado.apelido)
@@ -254,7 +255,7 @@ async function handleDM(sock, m, jid) {
   }
 
   if (/^\/ajuda$/i.test(texto)) {
-    await sock.sendMessage(jid, { text: `Comandos:\n${AJUDA_COMANDOS}` })
+    await enviarMsg(sock, jid, { text: `Comandos:\n${AJUDA_COMANDOS}` })
     return
   }
 
@@ -267,7 +268,7 @@ async function handleDM(sock, m, jid) {
   if (comandoDuvida) {
     try {
       const resposta = await perguntarIA(jid, comandoDuvida[1].trim())
-      if (resposta) await sock.sendMessage(jid, { text: resposta })
+      if (resposta) await enviarMsg(sock, jid, { text: resposta })
     } catch (erro) {
       console.error('IA (/duvida):', erro)
     }
@@ -294,7 +295,7 @@ async function handleDM(sock, m, jid) {
   if (texto) {
     try {
       const resposta = await perguntarIA(jid, texto)
-      if (resposta) await sock.sendMessage(jid, { text: resposta })
+      if (resposta) await enviarMsg(sock, jid, { text: resposta })
     } catch (erro) {
       console.error('IA (privado):', erro)
     }
@@ -356,6 +357,7 @@ async function connectToWhatsApp() {
       processarInatividadeDiaria(sock).catch((erro) => console.error('processar inatividade (inicial):', erro))
       // Mesma lógica: roda já na conexão, não só depois de 15 min do setInterval.
       revisarMembrosIncompletos(sock).catch((erro) => console.error('revisar membros incompletas (inicial):', erro))
+      checarPrazoLinks(sock).catch((erro) => console.error('checar prazo de links (inicial):', erro))
     }
   })
 
@@ -405,11 +407,31 @@ async function connectToWhatsApp() {
             const motivo = update.action === 'leave' ? 'saida_voluntaria' : 'removida_adm_whatsapp'
             await avisarAdminEntrouSaiu('saiu', { apelido: inscricao.apelido || inscricao.nome, motivo })
 
-            // Saiu/foi tirada do grupo principal (Avisos) ou já não está em
-            // grupo nenhum: cancela a inscrição de fato (libera a vaga).
-            // Saiu só de um grupo específico (ex: só do Presencial): não
-            // mexe na inscrição, só avisa.
-            const saiuDoPrincipal = topico === 'avisos'
+            // Saiu do Presencial (sendo presencial): não cancela tudo, só
+            // rebaixa pra online — libera a vaga presencial, mas ela
+            // continua no clube pelos outros grupos.
+            if (topico === 'presencial' && inscricao.formato === 'presencial') {
+              await supabase.from('signups').update({ formato: 'online' }).eq('id', inscricao.signup_id)
+              if (update.action === 'leave') {
+                try {
+                  await enviarMsg(sock, participantJid, {
+                    text: 'Vi que você saiu do grupo do Presencial 💔 Entendemos que não quer mais participar dessa modalidade, então sua vaga presencial foi liberada e você passou a participar do Farol online.',
+                  })
+                } catch (erro) {
+                  console.error('aviso de saída do presencial (DM):', erro)
+                }
+              }
+              continue
+            }
+
+            // Saiu do grupo principal (Avisos), ou é presencial e saiu de
+            // um dos grupos "core" (Bate-papo/Leitura — pra quem também
+            // tem o Presencial, sair desses conta como desinteresse total),
+            // ou já não está em grupo nenhum: cancela a inscrição de fato
+            // (libera a vaga). Online saindo só do Bate-papo/Leitura
+            // (mantendo os outros): não mexe na inscrição, só avisa.
+            const coreParaPresencial = inscricao.formato === 'presencial' && (topico === 'bate_papo' || topico === 'leitura')
+            const saiuDoPrincipal = topico === 'avisos' || coreParaPresencial
             const aindaEmAlgumGrupo = saiuDoPrincipal ? false : await estaEmAlgumGrupoAtivo(sock, participantJid)
             if (saiuDoPrincipal || !aindaEmAlgumGrupo) {
               const { data: membro } = await supabase
@@ -417,7 +439,7 @@ async function connectToWhatsApp() {
               await desvincularECancelar(participantJid, membro?.signup_id || null, motivo)
               if (update.action === 'leave') {
                 try {
-                  await sock.sendMessage(participantJid, {
+                  await enviarMsg(sock, participantJid, {
                     text: 'Vi que você saiu do grupo do Farol 💔 Se quiser voltar, é só chamar a Administração ou fazer uma nova adesão pelo site.',
                   })
                 } catch (erro) {
@@ -488,6 +510,7 @@ connectToWhatsApp()
 
 // Limpeza de retenção, uma vez por dia.
 setInterval(() => limparMensagensAntigas().catch((e) => console.error('limpar mensagens:', e)), 24 * 60 * 60 * 1000)
+setInterval(() => limparEnviosAntigos().catch((e) => console.error('limpar envios antigos:', e)), 24 * 60 * 60 * 1000)
 
 // Avisos pendentes do painel admin ("avisar todas"): checa a cada 1 min. O
 // próprio processarAvisosPendentes já espera 5s entre cada mensagem.
@@ -532,5 +555,11 @@ setInterval(() => {
 setInterval(() => {
   if (sockAtual) revisarMembrosIncompletos(sockAtual).catch((e) => console.error('revisar membros incompletas:', e))
 }, 15 * 60 * 1000)
+
+// Prazo de 48h pra completar todos os grupos depois de receber os links:
+// passado isso sem completar, remove e libera a vaga. Checa a cada 30 min.
+setInterval(() => {
+  if (sockAtual) checarPrazoLinks(sockAtual).catch((e) => console.error('checar prazo de links:', e))
+}, 30 * 60 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)

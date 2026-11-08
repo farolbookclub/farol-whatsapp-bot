@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { enviarMsg } from './envio.js'
 
 const SITE_MEMBRAS = 'http://membrosfarol.vercel.app/'
 
@@ -70,7 +71,7 @@ async function postarProgresso(sock, registro) {
     if (!livro?.is_current) return // não é mais a leitura atual — não avisa no grupo
     const { texto, mention } = await textoProgresso(registro, livro.title)
     for (const g of await gruposLeitura()) {
-      await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
+      await enviarMsg(sock, g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
     }
   } catch (erro) {
     console.error('postar progresso:', erro)
@@ -83,7 +84,7 @@ async function postarNota(sock, registro) {
     if (!livro?.is_current) return // não é mais a leitura atual — não avisa no grupo
     const { texto, mention } = await textoNota(registro, livro.title)
     for (const g of await gruposLeitura()) {
-      await sock.sendMessage(g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
+      await enviarMsg(sock, g.group_jid, { text: texto, ...(mention ? { mentions: [mention] } : {}) })
     }
   } catch (erro) {
     console.error('postar nota:', erro)

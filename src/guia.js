@@ -1,5 +1,7 @@
 import fs from 'fs'
 import { supabase } from './supabase.js'
+import { enviarMsg } from './envio.js'
+import { desvincularECancelar } from './vinculo.js'
 
 const SITE_URL = 'https://biofarol.vercel.app'
 const OK = '\n\nResponda _Ok_ para continuar'
@@ -106,11 +108,11 @@ export async function gruposFaltandoTexto(sock, jid, formato) {
 async function finalizarGuia(sock, jid, formato) {
   const r = await gruposFaltandoTexto(sock, jid, formato)
   if (!r.configurado) {
-    await sock.sendMessage(jid, { text: 'Os grupos ainda não estão configurados. Chame a Administração 💖' })
+    await enviarMsg(sock, jid, { text: 'Os grupos ainda não estão configurados. Chame a Administração 💖' })
     return
   }
   if (r.completo) {
-    await sock.sendMessage(jid, {
+    await enviarMsg(sock, jid, {
       text: 'Você já está em todos os grupos. Bem-vinda! 💖\n\n' +
         'Ainda não se apresentou? Faça isso no *Bate-papo*: nome, cidade, livro favorito, pets e hobbies 📚\n\n' +
         COMANDOS_PV,
@@ -119,7 +121,63 @@ async function finalizarGuia(sock, jid, formato) {
   }
   const faltaTudo = r.faltando.length === r.totalGrupos
   const intro = faltaTudo ? 'Entre nos grupos (toque no link e peça para entrar):\n\n' : 'Falta entrar em:\n\n'
-  await sock.sendMessage(jid, { text: `${intro}${r.links}\n${COMANDOS_PV}` })
+  const aviso48h = '\n\n⏳ Esses links ficam disponíveis por 48h. Se você não entrar em todos nesse prazo, entendemos como desinteresse e a vaga é liberada.'
+  await enviarMsg(sock, jid, { text: `${intro}${r.links}\n${COMANDOS_PV}${aviso48h}` })
+
+  // Só marca (e só na 1ª vez) quando os links de fato saíram agora — é o
+  // início do prazo de 48h pra checarPrazoLinks. Isso é feito SÓ aqui, no
+  // momento real do envio: nunca em varredura/backfill, pra nunca pegar
+  // quem já tinha vínculo de antes dessa coluna existir.
+  const { data: membro } = await supabase.from('whatsapp_membros').select('links_enviados_em').eq('jid', jid).is('removido_em', null).maybeSingle()
+  if (membro && !membro.links_enviados_em) {
+    await supabase.from('whatsapp_membros').update({ links_enviados_em: new Date().toISOString() }).eq('jid', jid)
+  }
+}
+
+// 48h depois de mandar os links (links_enviados_em), se ainda não completou
+// todos os grupos do formato dela, entende como desinteresse: remove dos
+// grupos que ela estiver e cancela a inscrição (libera a vaga). Só mexe em
+// quem tem links_enviados_em preenchido — e isso só é marcado no momento
+// real do envio (finalizarGuia), nunca em varredura/backfill. Assim nunca
+// pega quem já tinha vínculo de antes dessa coluna existir.
+export async function checarPrazoLinks(sock) {
+  const limite = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+  const { data: membros } = await supabase
+    .from('whatsapp_membros')
+    .select('jid, signup_id, signups (formato)')
+    .is('removido_em', null)
+    .eq('codigo_enviado', false)
+    .not('links_enviados_em', 'is', null)
+    .lte('links_enviados_em', limite)
+  if (!membros?.length) return
+
+  for (const m of membros) {
+    const formato = m.signups?.formato
+    if (!formato || !m.signup_id) continue
+    try {
+      const r = await gruposFaltandoTexto(sock, m.jid, formato)
+      if (!r.configurado || r.completo) continue // completou nesse meio-tempo, nada a fazer
+
+      const grupos = await gruposParaEnviar(formato)
+      for (const g of grupos) {
+        try {
+          await sock.groupParticipantsUpdate(g.group_jid, [m.jid], 'remove')
+        } catch (erro) {
+          console.error(`remover (prazo 48h) de ${g.nome || g.group_jid}:`, erro)
+        }
+      }
+      await desvincularECancelar(m.jid, m.signup_id, 'prazo_48h_nao_completou')
+      try {
+        await enviarMsg(sock, m.jid, {
+          text: 'Como você não entrou em todos os grupos dentro de 48h, entendemos como desinteresse e sua vaga foi liberada 💔 Se quiser voltar, é só fazer uma nova inscrição pelo site.',
+        })
+      } catch (erro) {
+        console.error(`aviso de remoção por prazo ${m.jid}:`, erro)
+      }
+    } catch (erro) {
+      console.error(`checarPrazoLinks ${m.jid}:`, erro)
+    }
+  }
 }
 
 // Primeira etapa do guia (chamada logo depois de vincular a conta).
@@ -128,7 +186,7 @@ async function finalizarGuia(sock, jid, formato) {
 export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
   const fim = jaNosGrupos ? 'Vou te mandar um guia rapidinho 💕' : 'Antes de entrar, vou te mandar um guia rapidinho 💕'
   const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}! Eu sou o *Faroleiro*, o robô do *Farol* 💖\n${fim}${OK}`
-  await sock.sendMessage(jid, { text: texto })
+  await enviarMsg(sock, jid, { text: texto })
 }
 
 // Se a pessoa estiver no meio do guia (guia_etapa setado) e responder "Ok",
@@ -164,9 +222,9 @@ export async function tentarAvancarGuia(sock, jid, texto) {
     // celular) com esse texto de legenda; senão, cai pro texto puro.
     const foto = presencial ? FOTO_GRUPOS_PRESENCIAL : FOTO_GRUPOS_ONLINE
     if (fs.existsSync(foto)) {
-      await sock.sendMessage(jid, { image: fs.readFileSync(foto), caption: texto2 })
+      await enviarMsg(sock, jid, { image: fs.readFileSync(foto), caption: texto2 })
     } else {
-      await sock.sendMessage(jid, { text: texto2 })
+      await enviarMsg(sock, jid, { text: texto2 })
     }
     await supabase.from('whatsapp_membros').update({ guia_etapa: 2 }).eq('jid', jid)
     return true
@@ -174,22 +232,22 @@ export async function tentarAvancarGuia(sock, jid, texto) {
 
   if (etapa === 2) {
     if (fs.existsSync(FOTO_SITE_MEMBRAS)) {
-      await sock.sendMessage(jid, { image: fs.readFileSync(FOTO_SITE_MEMBRAS), caption: `${GUIA_SITE}${OK}` })
+      await enviarMsg(sock, jid, { image: fs.readFileSync(FOTO_SITE_MEMBRAS), caption: `${GUIA_SITE}${OK}` })
     } else {
-      await sock.sendMessage(jid, { text: `${GUIA_SITE}${OK}` })
+      await enviarMsg(sock, jid, { text: `${GUIA_SITE}${OK}` })
     }
     await supabase.from('whatsapp_membros').update({ guia_etapa: 3 }).eq('jid', jid)
     return true
   }
 
   if (etapa === 3) {
-    await sock.sendMessage(jid, { text: `${GUIA_LEITURA}${OK}` })
+    await enviarMsg(sock, jid, { text: `${GUIA_LEITURA}${OK}` })
     await supabase.from('whatsapp_membros').update({ guia_etapa: 4 }).eq('jid', jid)
     return true
   }
 
   if (etapa === 4) {
-    await sock.sendMessage(jid, { text: `${GUIA_SPOILER}${OK}` })
+    await enviarMsg(sock, jid, { text: `${GUIA_SPOILER}${OK}` })
     await supabase.from('whatsapp_membros').update({ guia_etapa: 5 }).eq('jid', jid)
     return true
   }

@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { enviarMsg } from './envio.js'
 
 // Processa pedidos de remoção vindos do cancelamento de inscrição no painel
 // admin (fica a cargo do bot porque ele roda no celular, sem endereço
@@ -69,7 +70,7 @@ export async function processarRemocoesPendentes(sock) {
         const texto = pedido.regra === 'outro' ? pedido.mensagem_personalizada || null : textoQuebraRegra(pedido.regra, membro)
         if (texto) {
           try {
-            await sock.sendMessage(membro.jid, { text: texto })
+            await enviarMsg(sock, membro.jid, { text: texto })
           } catch (erro) {
             console.error(`aviso de remoção por quebra de regra ${membro.jid}:`, erro)
           }

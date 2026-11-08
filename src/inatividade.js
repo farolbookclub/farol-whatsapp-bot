@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { avisarAdminErro } from './pushAdmin.js'
+import { enviarMsg } from './envio.js'
 
 // Verificação diária de inatividade (mesma regra do Telegram, Termo v1.1,
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
@@ -137,7 +138,7 @@ async function aniversarios(sock, hoje) {
       ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉\nParabéns! Que seu novo ciclo venha cheio de livros incríveis 💕`
       : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉\nParabéns! Que o novo ciclo de vocês venha cheio de livros incríveis 💕`
     try {
-      await sock.sendMessage(grupoJid, { text: texto, mentions: aniversariantes.map((m) => m.jid) })
+      await enviarMsg(sock, grupoJid, { text: texto, mentions: aniversariantes.map((m) => m.jid) })
     } catch (erro) {
       console.error('parabéns:', erro)
     }
@@ -242,7 +243,7 @@ async function aniversariosClube(sock, hoje) {
         `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ⚓`
 
     try {
-      await sock.sendMessage(grupoJid, { text: texto, mentions: grupo.map((m) => m.jid) })
+      await enviarMsg(sock, grupoJid, { text: texto, mentions: grupo.map((m) => m.jid) })
       postados += grupo.length
     } catch (erro) {
       console.error(`clube ${marco}:`, erro)
@@ -271,7 +272,7 @@ async function aniversarioFarol(sock, hoje) {
     .or('entrou_em.not.is.null,importada.eq.true')
 
   try {
-    await sock.sendMessage(grupoJid, {
+    await enviarMsg(sock, grupoJid, {
       text: `✨ Hoje o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 🎉📚\n\n` +
         `Desde 15/08/2024, já somos ${count ?? 0} integrantes lendo, trocando ideias e fazendo amizades 💖\n\n` +
         'Obrigada por fazerem do Farol esse lugar especial! 🫶🏻⚓\n' +
@@ -311,7 +312,7 @@ async function remover(sock, jid, signupId, grupos, limite, hoje) {
 
   let avisoOk = true
   try {
-    await sock.sendMessage(jid, { text: textoRemocao(limite) })
+    await enviarMsg(sock, jid, { text: textoRemocao(limite) })
   } catch (erro) {
     avisoOk = false
     console.error(`aviso de remoção ${jid}:`, erro)
@@ -339,7 +340,7 @@ function textoAprovacao(nome, dias, codigo) {
 async function pedirAprovacaoRemocao(sock, adminJid, m, nome, dias) {
   const codigo = gerarCodigo()
   try {
-    await sock.sendMessage(adminJid, { text: textoAprovacao(nome, dias, codigo) })
+    await enviarMsg(sock, adminJid, { text: textoAprovacao(nome, dias, codigo) })
   } catch (erro) {
     console.error(`pedido de aprovação de remoção ${m.jid}:`, erro)
     return 'erro ao avisar a admin'
@@ -518,7 +519,7 @@ export async function processarInatividadeDiaria(sock) {
       }
       let entregue = true
       try {
-        await sock.sendMessage(m.jid, { text: textoLembrete(dias, Math.max(config.dias_limite - dias, 1)) })
+        await enviarMsg(sock, m.jid, { text: textoLembrete(dias, Math.max(config.dias_limite - dias, 1)) })
       } catch (erro) {
         entregue = false
         console.error(`lembrete ${m.jid}:`, erro)

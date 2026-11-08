@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { conteudoMensagem } from './midia.js'
+import { enviarMsg } from './envio.js'
 
 const INTERVALO_MS = 5000 // 5s entre mensagens, pra não levar ban por flood
 
@@ -37,7 +38,7 @@ export async function processarAvisosPendentes(sock) {
       continue
     }
     try {
-      await sock.sendMessage(jid, conteudoMensagem(aviso))
+      await enviarMsg(sock, jid, conteudoMensagem(aviso))
       enviados++
     } catch (erro) {
       falhas.push({ nome, motivo: erro?.message || 'falha ao enviar' })

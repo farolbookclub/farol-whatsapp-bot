@@ -1,5 +1,6 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import { supabase } from './supabase.js'
+import { enviarMsg } from './envio.js'
 
 // Só transcreve áudio desses tópicos (não Avisos).
 const TOPICOS_TRANSCREVER = ['bate_papo', 'leitura', 'presencial']
@@ -92,7 +93,7 @@ export function iniciarEscutaTranscricoes(getSock) {
       const sock = getSock()
       if (!sock) return
       try {
-        await sock.sendMessage(
+        await enviarMsg(sock, 
           row.group_jid,
           { text: `*Transcrição*:\n_"${row.transcricao}"_` },
           { quoted: { key: { remoteJid: row.group_jid, id: row.msg_id, participant: row.participant || undefined, fromMe: false }, message: { audioMessage: {} } } },

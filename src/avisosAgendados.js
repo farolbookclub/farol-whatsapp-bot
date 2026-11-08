@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { conteudoMensagem } from './midia.js'
+import { enviarMsg } from './envio.js'
 
 const INTERVALO_MS = 5000 // 5s entre mensagens, pra não levar ban por flood
 
@@ -24,7 +25,7 @@ async function enviarParaSignups(sock, aviso, signups) {
       continue
     }
     try {
-      await sock.sendMessage(jid, conteudoMensagem(aviso))
+      await enviarMsg(sock, jid, conteudoMensagem(aviso))
       enviados++
     } catch (erro) {
       falhas.push({ nome, motivo: erro?.message || 'falha ao enviar' })
@@ -93,7 +94,7 @@ export async function processarAvisosAgendados(sock) {
     }
 
     try {
-      await sock.sendMessage(grupo.group_jid, conteudoMensagem(aviso))
+      await enviarMsg(sock, grupo.group_jid, conteudoMensagem(aviso))
       await supabase.from('whatsapp_avisos_agendados').update({ status: 'concluido', concluido_em: new Date().toISOString() }).eq('id', aviso.id)
     } catch (erro) {
       console.error('processarAvisosAgendados (grupo):', erro)
