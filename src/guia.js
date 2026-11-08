@@ -79,23 +79,37 @@ const COMANDOS_PV =
   'Dúvida? Mande aqui: */duvida* + sua pergunta.\n' +
   'Se eu não souber, pergunte no Bate-papo marcando a Kah 💖'
 
-// Última etapa do guia: confere de verdade (via groupMetadata) em quais
-// grupos a pessoa já está — manda link só do que realmente falta entrar,
-// em vez de confiar cegamente na flag ja_nos_grupos.
-async function finalizarGuia(sock, jid, formato) {
+// Confere de verdade (via groupMetadata) em quais grupos a pessoa já está —
+// devolve quais grupos faltam (com o link de cada um já pronto), ou
+// completo:true se já está em tudo. Usado no fim do guia, quando alguém
+// pede o código de novo, e no lembrete de 1h de grupo incompleto.
+export async function gruposFaltandoTexto(sock, jid, formato) {
   const grupos = await gruposParaEnviar(formato)
-  if (!grupos.length) {
-    await sock.sendMessage(jid, { text: 'Os grupos ainda não estão configurados. Chame a Administração 💖' })
-    return
-  }
+  if (!grupos.length) return { configurado: false, completo: false, faltando: [], totalGrupos: 0, links: '' }
+
   const emOrdem = emOrdemDeTopico(grupos)
   const faltando = []
   for (const g of emOrdem) {
     const dentro = await grupoTemMembro(sock, g.group_jid, jid)
     if (!dentro) faltando.push(g)
   }
+  if (!faltando.length) return { configurado: true, completo: true, faltando: [], totalGrupos: emOrdem.length, links: '' }
 
-  if (!faltando.length) {
+  let links = ''
+  for (const g of faltando) {
+    links += await linhaLink(sock, g)
+  }
+  return { configurado: true, completo: false, faltando, totalGrupos: emOrdem.length, links }
+}
+
+// Última etapa do guia.
+async function finalizarGuia(sock, jid, formato) {
+  const r = await gruposFaltandoTexto(sock, jid, formato)
+  if (!r.configurado) {
+    await sock.sendMessage(jid, { text: 'Os grupos ainda não estão configurados. Chame a Administração 💖' })
+    return
+  }
+  if (r.completo) {
     await sock.sendMessage(jid, {
       text: 'Você já está em todos os grupos. Bem-vinda! 💖\n\n' +
         'Ainda não se apresentou? Faça isso no *Bate-papo*: nome, cidade, livro favorito, pets e hobbies 📚\n\n' +
@@ -103,16 +117,9 @@ async function finalizarGuia(sock, jid, formato) {
     })
     return
   }
-
-  const faltaTudo = faltando.length === emOrdem.length
-  let texto = faltaTudo
-    ? 'Entre nos grupos (toque no link e peça para entrar):\n\n'
-    : 'Falta entrar em:\n\n'
-  for (const g of faltando) {
-    texto += await linhaLink(sock, g)
-  }
-  texto += `\n${COMANDOS_PV}`
-  await sock.sendMessage(jid, { text: texto })
+  const faltaTudo = r.faltando.length === r.totalGrupos
+  const intro = faltaTudo ? 'Entre nos grupos (toque no link e peça para entrar):\n\n' : 'Falta entrar em:\n\n'
+  await sock.sendMessage(jid, { text: `${intro}${r.links}\n${COMANDOS_PV}` })
 }
 
 // Primeira etapa do guia (chamada logo depois de vincular a conta).

@@ -17,7 +17,7 @@ import { perguntarIA } from './ia.js'
 import { processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
-import { checarCodigoPendente, checarEnviarCodigoSeCompleta } from './codigo.js'
+import { checarCodigoPendente, checarEnviarCodigoSeCompleta, responderPedidoCodigo, lembrarGruposIncompletos } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
 
@@ -71,13 +71,10 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
   }
 
   if (pode) {
+    // Sem aviso por grupo aqui: quando ela estiver em todos os grupos do
+    // formato dela, checarEnviarCodigoSeCompleta manda a mensagem oficial
+    // única (boas-vindas + código), chamada no handler de group-participants.update.
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'approve')
-    try {
-      const meta = await sock.groupMetadata(groupJid)
-      await sock.sendMessage(participantJid, { text: `Pronto, você entrou no ${meta.subject}! 🎉 Bem-vinda 💖` })
-    } catch (erro) {
-      console.error('aviso de entrada:', erro)
-    }
   } else {
     await sock.groupRequestParticipantsUpdate(groupJid, [participantJid], 'reject')
     // Sem inscrição (nunca foi, ou saiu/foi removida): recusa quieta, sem
@@ -273,6 +270,18 @@ async function handleDM(sock, m, jid) {
       if (resposta) await sock.sendMessage(jid, { text: resposta })
     } catch (erro) {
       console.error('IA (/duvida):', erro)
+    }
+    return
+  }
+
+  // Pedido do código de novo (ex.: "não achei o código", "cadê o código"):
+  // responde na hora, sem IA — só manda se ela já estiver em todos os
+  // grupos do formato dela; senão, avisa o que falta.
+  if (/c[oó]digo/i.test(texto)) {
+    try {
+      await responderPedidoCodigo(sock, jid, inscricao.signup_id, inscricao.formato)
+    } catch (erro) {
+      console.error('pedido de código:', erro)
     }
     return
   }
@@ -514,5 +523,11 @@ setInterval(() => {
 setInterval(() => {
   if (sockAtual) processarInatividadeDiaria(sockAtual).catch((e) => console.error('processar inatividade:', e))
 }, 30 * 60 * 1000)
+
+// Lembrete de grupo incompleto (1h depois de detectar que falta algum):
+// checa a cada 15 min; a própria função só manda 1x por pessoa.
+setInterval(() => {
+  if (sockAtual) lembrarGruposIncompletos(sockAtual).catch((e) => console.error('lembrar grupos incompletos:', e))
+}, 15 * 60 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)
