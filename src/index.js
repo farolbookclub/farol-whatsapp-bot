@@ -420,7 +420,7 @@ async function connectToWhatsApp() {
           try {
             const inscricao = await inscricaoDoJid(participantJid)
             if (!inscricao) continue
-            const motivo = update.action === 'leave' ? 'saida_voluntaria' : 'removida_adm_whatsapp'
+            const motivo = update.action === 'leave' ? 'saida_voluntaria_grupo' : 'removida_adm_whatsapp'
             await avisarAdminEntrouSaiu('saiu', { apelido: inscricao.apelido || inscricao.nome, motivo })
 
             // Saiu do Presencial (sendo presencial): não cancela tudo, só

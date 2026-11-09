@@ -2,15 +2,32 @@ import { supabase } from './supabase.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Todos os motivos possíveis de cancelado_motivo (espelha o MOTIVO_SAIDA do
-// painel admin) — em formato "devido a X", pra montar a frase pra pessoa.
-const MOTIVO_TEXTO = {
-  saida_voluntaria: 'sua saída voluntária dos grupos',
-  quebra_regra: 'quebra de uma das regras do clube',
-  outro_motivo: 'outro motivo',
-  inatividade: 'inatividade (ficar tempo demais sem interagir nos grupos)',
-  removida_adm_whatsapp: 'ter sido removida de um grupo pela Administração',
-  prazo_48h_nao_completou: 'não ter entrado em todos os grupos dentro do prazo de 48h',
+// Texto pra cada motivo de cancelamento possível (cancelado_motivo +, pra
+// quebra_regra, o começo de cancelado_detalhe — que guarda o rótulo da
+// regra escolhida no painel: "Ausência virtual", "3 encontros sem ir" etc.).
+// outro_motivo, removida_adm_whatsapp e sem motivo registrado caem todos no
+// genérico (fallback), de propósito.
+function textoMotivoCancelamento(motivo, detalhe) {
+  const d = detalhe || ''
+  if (motivo === 'inatividade' || d.startsWith('Ausência virtual')) {
+    return 'Sua inscrição foi cancelada por inatividade: foram 30 dias sem interagir no clube.'
+  }
+  if (d.startsWith('3 encontros sem ir')) {
+    return 'Sua inscrição foi cancelada porque você faltou a 3 encontros presenciais seguidos.'
+  }
+  if (motivo === 'quebra_regra') {
+    return 'Sua inscrição foi cancelada porque uma das regras do clube não foi cumprida.'
+  }
+  if (motivo === 'prazo_48h_nao_completou') {
+    return 'Sua inscrição foi cancelada porque você não entrou em todos os grupos dentro das 48h.'
+  }
+  if (motivo === 'saida_voluntaria_grupo') {
+    return 'Sua inscrição foi cancelada porque você saiu de um ou mais grupos do clube.'
+  }
+  if (motivo === 'saida_voluntaria') {
+    return 'Sua inscrição foi cancelada a pedido, por saída voluntária.'
+  }
+  return 'Sua inscrição foi cancelada.'
 }
 
 // Quem aparece de verdade é sempre o "Nome ou apelido de exibição"
@@ -52,17 +69,16 @@ export async function vincularConta(jid, token) {
 
   const { data: cadastro, error: erroCadastro } = await supabase
     .from('signups')
-    .select('id, status, nome, apelido, formato, cancelado_motivo')
+    .select('id, status, nome, apelido, formato, cancelado_motivo, cancelado_detalhe')
     .eq('confirmation_token', token)
     .maybeSingle()
   if (erroCadastro) console.error('vincularConta (buscar signup):', erroCadastro.message, erroCadastro.code)
   if (!cadastro) return { ok: false, texto: 'Link inválido. Abra *Minha inscrição* e use o botão de lá.' }
   if (cadastro.status !== 'aprovado') {
-    const motivoTexto = cadastro.cancelado_motivo && MOTIVO_TEXTO[cadastro.cancelado_motivo]
     return {
       ok: false,
       texto: cadastro.status === 'cancelado'
-        ? `Sua inscrição foi cancelada${motivoTexto ? ` devido a ${motivoTexto}` : ''}. Para voltar, faça uma nova adesão no site do Farol.`
+        ? `${textoMotivoCancelamento(cadastro.cancelado_motivo, cadastro.cancelado_detalhe)} Para voltar, faça uma nova adesão no site do Farol. A aprovação depende de vaga disponível.`
         : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e toque no botão de novo.',
     }
   }
