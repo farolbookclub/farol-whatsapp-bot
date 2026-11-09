@@ -100,18 +100,28 @@ async function postarNota(sock, registro) {
 // se o WhatsApp reconectar o socket troca, mas a inscrição do Realtime
 // continua a mesma — só precisa chamar isso 1x, não a cada reconexão.
 export function iniciarEscutaLeitura(getSock) {
-  supabase
-    .channel('leitura-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'progresso_leitura' }, (payload) => {
-      const sock = getSock()
-      if (sock) postarProgresso(sock, payload.new)
-    })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'public_ratings' }, (payload) => {
-      const sock = getSock()
-      if (sock) postarNota(sock, payload.new)
-    })
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') console.log('Escutando progresso de leitura em tempo real.')
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('Realtime (leitura) caiu:', status)
-    })
+  function assinar() {
+    const canal = supabase
+      .channel(`leitura-realtime-${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'progresso_leitura' }, (payload) => {
+        const sock = getSock()
+        if (sock) postarProgresso(sock, payload.new)
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'public_ratings' }, (payload) => {
+        const sock = getSock()
+        if (sock) postarNota(sock, payload.new)
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log('Escutando progresso de leitura em tempo real.')
+        // Sem isso, uma queda de conexão com o Supabase deixava esse canal
+        // morto pro resto da vida do processo (só voltava reiniciando o
+        // bot). Agora tenta de novo sozinho em 10s.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('Realtime (leitura) caiu:', status, '— tentando de novo em 10s')
+          supabase.removeChannel(canal)
+          setTimeout(assinar, 10_000)
+        }
+      })
+  }
+  assinar()
 }

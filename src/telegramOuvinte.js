@@ -230,15 +230,41 @@ export async function iniciarOuvinteTelegram() {
 
   // Realtime: novo pedido de transcrição -> entra na fila (só se achou o bot).
   if (transcriberId) {
-    supabase
-      .channel('transcricoes-pedido-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transcricoes_pendentes' }, (payload) => {
-        if (payload.new.status === 'pendente') processarFilaTranscricoes(client, grupo, transcriberId)
-      })
-      .subscribe()
+    function assinarPedidos() {
+      const canal = supabase
+        .channel(`transcricoes-pedido-realtime-${Date.now()}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transcricoes_pendentes' }, (payload) => {
+          if (payload.new.status === 'pendente') processarFilaTranscricoes(client, grupo, transcriberId)
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') console.log('[Telegram] Escutando pedidos de transcrição em tempo real.')
+          // Sem isso, uma queda de conexão com o Supabase deixava esse canal
+          // morto pro resto da vida do processo (só voltava reiniciando o
+          // bot) — os áudios ficavam parados em "pendente" pra sempre.
+          // Agora tenta de novo sozinho em 10s, e revarre o que ficou
+          // parado nesse meio-tempo.
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('[Telegram] Realtime (pedidos de transcrição) caiu:', status, '— tentando de novo em 10s')
+            supabase.removeChannel(canal)
+            setTimeout(() => {
+              assinarPedidos()
+              processarFilaTranscricoes(client, grupo, transcriberId)
+            }, 10_000)
+          }
+        })
+    }
+    assinarPedidos()
 
     // Pega o que ficou pendente de antes de o processo iniciar (ex.: reinício).
     processarFilaTranscricoes(client, grupo, transcriberId)
+
+    // Reforço: mesmo com a reconexão automática acima, um Realtime que trava
+    // "silenciosamente" (sem nunca disparar CHANNEL_ERROR/TIMED_OUT/CLOSED)
+    // deixaria áudio parado em "pendente" sem ninguém notar. Essa checagem
+    // de segurança roda de qualquer jeito a cada 5 min.
+    setInterval(() => {
+      processarFilaTranscricoes(client, grupo, transcriberId).catch((erro) => console.error('[Telegram] checagem periódica de pendentes:', erro))
+    }, 5 * 60 * 1000)
   }
 
   console.log(`[Telegram] Ouvindo o grupo "${GRUPO_NOME}" (Maratona + transcrição de áudio, bot: @${TRANSCRIBER_USERNAME}).`)

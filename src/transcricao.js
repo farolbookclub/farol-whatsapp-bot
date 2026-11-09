@@ -85,25 +85,36 @@ export async function processarComandoTranscrevePV(m, jid) {
 // Escuta (Realtime, sem polling) quando uma transcrição fica pronta e posta
 // no grupo de origem, como resposta à mensagem do áudio.
 export function iniciarEscutaTranscricoes(getSock) {
-  supabase
-    .channel('transcricoes-realtime')
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transcricoes_pendentes' }, async (payload) => {
-      const row = payload.new
-      if (row.status !== 'concluido' || !row.transcricao) return
-      const sock = getSock()
-      if (!sock) return
-      try {
-        await enviarMsg(sock, 
-          row.group_jid,
-          { text: `*Transcrição*:\n_"${row.transcricao}"_` },
-          { quoted: { key: { remoteJid: row.group_jid, id: row.msg_id, participant: row.participant || undefined, fromMe: false }, message: { audioMessage: {} } } },
-        )
-      } catch (erro) {
-        console.error('postar transcrição:', erro)
-      }
-    })
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') console.log('Escutando transcrições de áudio em tempo real.')
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('Realtime (transcrições) caiu:', status)
-    })
+  function assinar() {
+    const canal = supabase
+      .channel(`transcricoes-realtime-${Date.now()}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transcricoes_pendentes' }, async (payload) => {
+        const row = payload.new
+        if (row.status !== 'concluido' || !row.transcricao) return
+        const sock = getSock()
+        if (!sock) return
+        try {
+          await enviarMsg(
+            sock,
+            row.group_jid,
+            { text: `*Transcrição*:\n_"${row.transcricao}"_` },
+            { quoted: { key: { remoteJid: row.group_jid, id: row.msg_id, participant: row.participant || undefined, fromMe: false }, message: { audioMessage: {} } } },
+          )
+        } catch (erro) {
+          console.error('postar transcrição:', erro)
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') console.log('Escutando transcrições de áudio em tempo real.')
+        // Sem isso, uma queda de conexão com o Supabase deixava esse canal
+        // morto pro resto da vida do processo (só voltava reiniciando o
+        // bot). Agora tenta de novo sozinho em 10s.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.error('Realtime (transcrições) caiu:', status, '— tentando de novo em 10s')
+          supabase.removeChannel(canal)
+          setTimeout(assinar, 10_000)
+        }
+      })
+  }
+  assinar()
 }

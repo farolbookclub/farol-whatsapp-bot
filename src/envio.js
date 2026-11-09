@@ -3,8 +3,8 @@ import { supabase } from './supabase.js'
 // Envia e guarda o "key" da mensagem (jid, msg_id), pra dar pra apagar
 // depois se precisar (ex.: mensagem mandada por engano). Guarda só por
 // alguns dias (limparEnviosAntigos), nada de ficar acumulando pra sempre.
-export async function enviarMsg(sock, jid, conteudo) {
-  const resultado = await sock.sendMessage(jid, conteudo)
+export async function enviarMsg(sock, jid, conteudo, opcoes) {
+  const resultado = await sock.sendMessage(jid, conteudo, opcoes)
   const msgId = resultado?.key?.id
   if (msgId) {
     supabase
