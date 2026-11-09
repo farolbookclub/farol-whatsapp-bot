@@ -453,7 +453,7 @@ async function connectToWhatsApp() {
               if (update.action === 'leave') {
                 try {
                   await enviarMsg(sock, participantJid, {
-                    text: 'Vi que você saiu do grupo do Farol 💔 Se quiser voltar, é só chamar a Administração ou fazer uma nova adesão pelo site.',
+                    text: 'Vi que você saiu de um dos grupos do Farol 💔 Por isso, você foi removida automaticamente de todos os grupos do clube. Se quiser voltar, faça uma nova adesão no site do Farol. A aprovação depende de vaga disponível.',
                   })
                 } catch (erro) {
                   console.error('aviso de saída (DM):', erro)
