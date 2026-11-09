@@ -7,7 +7,7 @@ import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
 import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar, apresentacaoDoSignup } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
-import { iniciarEscutaLeitura } from './avisoLeitura.js'
+import { iniciarEscutaLeitura, postarProgresso } from './avisoLeitura.js'
 import { processarAudioGrupo, processarComandoTranscreve, processarAudioPV, processarComandoTranscrevePV, iniciarEscutaTranscricoes } from './transcricao.js'
 import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
@@ -220,6 +220,22 @@ async function handleDM(sock, m, jid) {
     await enviarMsg(sock, jid, {
       text: resultado ? `Adiei a remoção da ${resultado.nome} até ${resultado.ate} 💖` : 'Não achei pedido pendente com esse código.',
     })
+    return
+  }
+
+  // Reposta no grupo uma atualização de progresso que não saiu na hora
+  // (ex.: Realtime fora do ar num momento ruim). Pelo id da linha em
+  // progresso_leitura (visível no Supabase).
+  const comandoReenviarProgresso = texto.match(/^!reenviarprogresso\s+([0-9a-f-]{36})$/i)
+  if (comandoReenviarProgresso) {
+    if (!ehAdmin) return
+    const { data: registro } = await supabase.from('progresso_leitura').select('*').eq('id', comandoReenviarProgresso[1]).maybeSingle()
+    if (!registro) {
+      await enviarMsg(sock, jid, { text: 'Não achei nenhuma atualização de progresso com esse id.' })
+      return
+    }
+    await postarProgresso(sock, registro)
+    await enviarMsg(sock, jid, { text: 'Pronto, reenviei 💖' })
     return
   }
 

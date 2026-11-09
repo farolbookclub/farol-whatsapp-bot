@@ -65,7 +65,7 @@ async function gruposLeitura() {
   return data ?? []
 }
 
-async function postarProgresso(sock, registro) {
+export async function postarProgresso(sock, registro) {
   try {
     const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
     if (!livro?.is_current) return // não é mais a leitura atual — não avisa no grupo
