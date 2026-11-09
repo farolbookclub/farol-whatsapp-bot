@@ -2,6 +2,17 @@ import { supabase } from './supabase.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Todos os motivos possíveis de cancelado_motivo (espelha o MOTIVO_SAIDA do
+// painel admin) — em formato "devido a X", pra montar a frase pra pessoa.
+const MOTIVO_TEXTO = {
+  saida_voluntaria: 'sua saída voluntária dos grupos',
+  quebra_regra: 'quebra de uma das regras do clube',
+  outro_motivo: 'outro motivo',
+  inatividade: 'inatividade (ficar tempo demais sem interagir nos grupos)',
+  removida_adm_whatsapp: 'ter sido removida de um grupo pela Administração',
+  prazo_48h_nao_completou: 'não ter entrado em todos os grupos dentro do prazo de 48h',
+}
+
 // Quem aparece de verdade é sempre o "Nome ou apelido de exibição"
 // (membras.nome_exibicao, igual no site) — nunca o apelido/nome crus do
 // cadastro. fallback é usado só se ainda não tiver membra (ou nome_exibicao
@@ -41,16 +52,17 @@ export async function vincularConta(jid, token) {
 
   const { data: cadastro, error: erroCadastro } = await supabase
     .from('signups')
-    .select('id, status, nome, apelido, formato')
+    .select('id, status, nome, apelido, formato, cancelado_motivo')
     .eq('confirmation_token', token)
     .maybeSingle()
   if (erroCadastro) console.error('vincularConta (buscar signup):', erroCadastro.message, erroCadastro.code)
   if (!cadastro) return { ok: false, texto: 'Link inválido. Abra *Minha inscrição* e use o botão de lá.' }
   if (cadastro.status !== 'aprovado') {
+    const motivoTexto = cadastro.cancelado_motivo && MOTIVO_TEXTO[cadastro.cancelado_motivo]
     return {
       ok: false,
       texto: cadastro.status === 'cancelado'
-        ? 'Sua inscrição foi cancelada. Para voltar, faça uma nova adesão no site do Farol.'
+        ? `Sua inscrição foi cancelada${motivoTexto ? ` devido a ${motivoTexto}` : ''}. Para voltar, faça uma nova adesão no site do Farol.`
         : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e toque no botão de novo.',
     }
   }
