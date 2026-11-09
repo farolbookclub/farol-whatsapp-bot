@@ -440,14 +440,11 @@ async function connectToWhatsApp() {
               continue
             }
 
-            // Saiu do grupo principal (Avisos), ou é presencial e saiu de
-            // um dos grupos "core" (Bate-papo/Leitura — pra quem também
-            // tem o Presencial, sair desses conta como desinteresse total),
-            // ou já não está em grupo nenhum: cancela a inscrição de fato
-            // (libera a vaga). Online saindo só do Bate-papo/Leitura
-            // (mantendo os outros): não mexe na inscrição, só avisa.
-            const coreParaPresencial = inscricao.formato === 'presencial' && (topico === 'bate_papo' || topico === 'leitura')
-            const saiuDoPrincipal = topico === 'avisos' || coreParaPresencial
+            // Saiu de um grupo essencial (Avisos, Bate-papo ou Leitura do
+            // mês — vale pra todo mundo, presencial ou online, igual diz a
+            // regrinha do site) ou já não está em grupo nenhum: cancela a
+            // inscrição de fato (libera a vaga).
+            const saiuDoPrincipal = topico === 'avisos' || topico === 'bate_papo' || topico === 'leitura'
             const aindaEmAlgumGrupo = saiuDoPrincipal ? false : await estaEmAlgumGrupoAtivo(sock, participantJid)
             if (saiuDoPrincipal || !aindaEmAlgumGrupo) {
               const { data: membro } = await supabase
