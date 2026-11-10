@@ -2,6 +2,7 @@ import { supabase } from './supabase.js'
 import { avisarAdminErro } from './pushAdmin.js'
 import { enviarMsg } from './envio.js'
 import { avisarInstagramSaiu } from './instagramAviso.js'
+import { postarAniversarioInstagram, postarTempoClubeInstagram } from './instagramAniversario.js'
 
 // Verificação diária de inatividade (mesma regra do Telegram, Termo v1.1,
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
@@ -143,6 +144,9 @@ async function aniversarios(sock, hoje) {
     } catch (erro) {
       console.error('parabéns:', erro)
     }
+    for (const m of aniversariantes) {
+      postarAniversarioInstagram(m.signup_id).catch((erro) => console.error('instagram aniversário:', erro))
+    }
   }
 
   await supabase.from('bot_config').update({ aniversarios_postados_em_whatsapp: hoje }).eq('id', 1)
@@ -248,6 +252,9 @@ async function aniversariosClube(sock, hoje) {
       postados += grupo.length
     } catch (erro) {
       console.error(`clube ${marco}:`, erro)
+    }
+    for (const m of grupo) {
+      postarTempoClubeInstagram(m.signup_id, marco).catch((erro) => console.error('instagram tempo de clube:', erro))
     }
   }
 
