@@ -158,6 +158,11 @@ export async function checarPrazoLinks(sock) {
       const r = await gruposFaltandoTexto(sock, m.jid, formato)
       if (!r.configurado || r.completo) continue // completou nesse meio-tempo, nada a fazer
 
+      // Cancela ANTES de remover dos grupos — senão o próprio
+      // group-participants.update disparado por essa remoção (do bot)
+      // chega enquanto a inscrição ainda tá "aprovada" e o handler acha
+      // que foi uma admin removendo manualmente, gravando o motivo errado.
+      await desvincularECancelar(m.jid, m.signup_id, 'prazo_48h_nao_completou')
       const grupos = await gruposParaEnviar(formato)
       for (const g of grupos) {
         try {
@@ -166,7 +171,6 @@ export async function checarPrazoLinks(sock) {
           console.error(`remover (prazo 48h) de ${g.nome || g.group_jid}:`, erro)
         }
       }
-      await desvincularECancelar(m.jid, m.signup_id, 'prazo_48h_nao_completou')
       try {
         await enviarMsg(sock, m.jid, {
           text: 'Como você não entrou em todos os grupos dentro de 48h, entendemos como desinteresse e sua vaga foi liberada 💔 Se quiser voltar, é só fazer uma nova inscrição pelo site.',

@@ -288,21 +288,26 @@ async function aniversarioFarol(sock, hoje) {
 
 // Remoção real por inatividade. Devolve o texto do resultado pro log.
 async function remover(sock, jid, signupId, grupos, limite, hoje) {
-  for (const g of grupos) {
-    try {
-      await sock.groupParticipantsUpdate(g.group_jid, [jid], 'remove')
-    } catch (erro) {
-      console.error(`remover de ${g.nome || g.group_jid}:`, erro)
-    }
-  }
-
+  // Cancela a inscrição ANTES de remover dos grupos (não depois): assim,
+  // quando o group-participants.update disparar pra cada grupo (porque o
+  // próprio bot removeu), o handler já vê a inscrição cancelada e não
+  // confunde essa remoção automática com "removida por uma admin direto
+  // no grupo" (que é só pra remoção manual mesmo, feita por uma pessoa).
   if (signupId) {
     const { error: erroSignup } = await supabase
       .from('signups')
       .update({ status: 'cancelado', cancelado_motivo: 'inatividade', cancelado_em: new Date().toISOString() })
       .eq('id', signupId)
       .neq('status', 'cancelado')
-    if (erroSignup) return `removida dos grupos, mas erro ao cancelar inscrição: ${erroSignup.message}`
+    if (erroSignup) return `erro ao cancelar inscrição: ${erroSignup.message}`
+  }
+
+  for (const g of grupos) {
+    try {
+      await sock.groupParticipantsUpdate(g.group_jid, [jid], 'remove')
+    } catch (erro) {
+      console.error(`remover de ${g.nome || g.group_jid}:`, erro)
+    }
   }
 
   await supabase
