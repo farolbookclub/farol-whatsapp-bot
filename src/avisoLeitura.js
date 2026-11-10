@@ -80,6 +80,10 @@ export async function postarProgresso(sock, registro) {
 
 async function postarNota(sock, registro) {
   try {
+    // Esse INSERT pode ser só o site marcando "lendo" (sem nota nenhuma,
+    // ex: ao atualizar progresso) — nesse caso rating vem null, e não é
+    // uma avaliação de verdade pra anunciar no grupo.
+    if (registro.rating === null || registro.rating === undefined) return
     const { data: livro } = await supabase.from('books').select('title, is_current').eq('id', registro.book_id).maybeSingle()
     if (!livro?.is_current) return // não é mais a leitura atual — não avisa no grupo
     const { texto, mention } = await textoNota(registro, livro.title)
