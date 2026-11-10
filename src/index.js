@@ -21,6 +21,7 @@ import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente, checarEnviarCodigoSeCompleta, responderPedidoCodigo, revisarMembrosIncompletos } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
+import { confirmarInstagramPendente } from './instagramAviso.js'
 
 const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖'
 
@@ -204,6 +205,25 @@ async function handleDM(sock, m, jid) {
 
   const { data: configAdmin } = await supabase.from('bot_config').select('admin_jid_whatsapp').eq('id', 1).maybeSingle()
   const ehAdmin = configAdmin?.admin_jid_whatsapp === jid
+
+  // Confirmação da admin pro aviso de "entrou no clube, adiciona no
+  // Instagram" (ver instagramAviso.js). Só mexe se tiver alguém pendente de
+  // verdade — senão a mensagem segue o fluxo normal (ex.: vira pergunta pra
+  // IA), pra não atrapalhar uma conversa qualquer que use essas palavras.
+  if (ehAdmin && /^(ok|okay|blz|beleza|feito|t[áa]|pronto|adicionei|adicionad[oa])[.!]*$/i.test(texto.trim())) {
+    const r = await confirmarInstagramPendente('adicionada')
+    if (r) {
+      await enviarMsg(sock, jid, { text: `✅ Marquei ${r.apelido} como "adicionada no Instagram".` })
+      return
+    }
+  }
+  if (ehAdmin && /n[ãa]o\s*(tem|possui)?\s*insta(gram)?|sem\s*insta(gram)?/i.test(texto.trim())) {
+    const r = await confirmarInstagramPendente('sem_instagram')
+    if (r) {
+      await enviarMsg(sock, jid, { text: `✅ Marquei ${r.apelido} como "sem Instagram".` })
+      return
+    }
+  }
 
   const comandoAprovar = texto.match(/^!aprovar\s+([a-z0-9]{4})$/i)
   if (comandoAprovar) {
@@ -449,7 +469,7 @@ async function connectToWhatsApp() {
             if (saiuDoPrincipal || !aindaEmAlgumGrupo) {
               const { data: membro } = await supabase
                 .from('whatsapp_membros').select('signup_id').eq('jid', participantJid).is('removido_em', null).maybeSingle()
-              await desvincularECancelar(participantJid, membro?.signup_id || null, motivo)
+              await desvincularECancelar(sock, participantJid, membro?.signup_id || null, motivo)
               if (update.action === 'leave') {
                 try {
                   await enviarMsg(sock, participantJid, {

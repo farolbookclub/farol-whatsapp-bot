@@ -1,6 +1,13 @@
 import { supabase } from './supabase.js'
 import { gruposParaEnviar, grupoTemMembro, gruposFaltandoTexto } from './guia.js'
 import { enviarMsg } from './envio.js'
+import { avisarInstagramEntrou } from './instagramAviso.js'
+
+async function avisarInstagramSeTiver(sock, signupId) {
+  const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
+  if (!s) return
+  await avisarInstagramEntrou(sock, signupId, s.apelido || s.nome, s.instagram)
+}
 
 // Manda o código sempre em 2 mensagens: uma com o contexto/link, outra só
 // com o código em si (sem mais nada), pra facilitar copiar e colar.
@@ -67,6 +74,7 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
     await enviarMsg(sock, jid, { text: 'Pronto, você está oficialmente no Farol! 🎉 Bem-vinda 💖' })
     await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, '🔑 Código do site de membras:')
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
+    await avisarInstagramSeTiver(sock, signupId)
   } catch (erro) {
     console.error(`enviar código ${jid}:`, erro)
   }
@@ -130,6 +138,7 @@ export async function revisarMembrosIncompletos(sock) {
         await enviarMsg(sock, m.jid, { text: 'Pronto, você está oficialmente no Farol! 🎉 Bem-vinda 💖' })
         await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, '🔑 Código do site de membras:')
         await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', m.jid)
+        await avisarInstagramSeTiver(sock, m.signup_id)
         continue
       }
 

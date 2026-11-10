@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { avisarInstagramSaiu } from './instagramAviso.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -164,7 +165,7 @@ export async function registrarInteracao(jid) {
 // Saiu/foi removida de todos os grupos (ou do Avisos, o "grupo principal"):
 // cancela a inscrição (libera a vaga) e desfaz o vínculo. Espelha o que o
 // Telegram já fazia (saidaDoGrupo) — lá só existe 1 grupo, aqui são vários.
-export async function desvincularECancelar(jid, signupId, motivo) {
+export async function desvincularECancelar(sock, jid, signupId, motivo) {
   await supabase
     .from('whatsapp_membros')
     .update({ removido_em: new Date().toISOString().slice(0, 10), signup_id: null, lembrete_ref: null })
@@ -175,6 +176,7 @@ export async function desvincularECancelar(jid, signupId, motivo) {
     .update({ status: 'cancelado', cancelado_motivo: motivo, cancelado_em: new Date().toISOString() })
     .eq('id', signupId)
     .neq('status', 'cancelado')
+  await avisarInstagramSaiu(sock, signupId)
 }
 
 // A inscrição aprovada ligada a esse jid (ou null). "apelido" já vem

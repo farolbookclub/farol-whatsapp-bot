@@ -162,7 +162,7 @@ export async function checarPrazoLinks(sock) {
       // group-participants.update disparado por essa remoção (do bot)
       // chega enquanto a inscrição ainda tá "aprovada" e o handler acha
       // que foi uma admin removendo manualmente, gravando o motivo errado.
-      await desvincularECancelar(m.jid, m.signup_id, 'prazo_48h_nao_completou')
+      await desvincularECancelar(sock, m.jid, m.signup_id, 'prazo_48h_nao_completou')
       const grupos = await gruposParaEnviar(formato)
       for (const g of grupos) {
         try {

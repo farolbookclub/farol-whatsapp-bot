@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 import { avisarAdminErro } from './pushAdmin.js'
 import { enviarMsg } from './envio.js'
+import { avisarInstagramSaiu } from './instagramAviso.js'
 
 // Verificação diária de inatividade (mesma regra do Telegram, Termo v1.1,
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
@@ -300,6 +301,7 @@ async function remover(sock, jid, signupId, grupos, limite, hoje) {
       .eq('id', signupId)
       .neq('status', 'cancelado')
     if (erroSignup) return `erro ao cancelar inscrição: ${erroSignup.message}`
+    await avisarInstagramSaiu(sock, signupId)
   }
 
   for (const g of grupos) {
