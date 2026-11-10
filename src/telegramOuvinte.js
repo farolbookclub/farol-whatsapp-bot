@@ -230,6 +230,7 @@ export async function iniciarOuvinteTelegram() {
 
   // Realtime: novo pedido de transcrição -> entra na fila (só se achou o bot).
   if (transcriberId) {
+    let tentativaPedidos = 0
     function assinarPedidos() {
       const canal = supabase
         .channel(`transcricoes-pedido-realtime-${Date.now()}`)
@@ -237,19 +238,27 @@ export async function iniciarOuvinteTelegram() {
           if (payload.new.status === 'pendente') processarFilaTranscricoes(client, grupo, transcriberId)
         })
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') console.log('[Telegram] Escutando pedidos de transcrição em tempo real.')
+          if (status === 'SUBSCRIBED') {
+            tentativaPedidos = 0
+            console.log('[Telegram] Escutando pedidos de transcrição em tempo real.')
+          }
           // Sem isso, uma queda de conexão com o Supabase deixava esse canal
           // morto pro resto da vida do processo (só voltava reiniciando o
           // bot) — os áudios ficavam parados em "pendente" pra sempre.
-          // Agora tenta de novo sozinho em 10s, e revarre o que ficou
-          // parado nesse meio-tempo.
+          // Agora tenta de novo sozinho, com espera crescente (10s, 20s...
+          // até 5 min) — martelar sem parar numa rede instável já causou
+          // outro problema (erro de pilha no cliente do Supabase), então
+          // não insiste sempre no mesmo ritmo. Revarre o que ficou parado
+          // nesse meio-tempo.
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            console.error('[Telegram] Realtime (pedidos de transcrição) caiu:', status, '— tentando de novo em 10s')
+            tentativaPedidos++
+            const espera = Math.min(10_000 * tentativaPedidos, 5 * 60 * 1000)
+            console.error('[Telegram] Realtime (pedidos de transcrição) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
             supabase.removeChannel(canal)
             setTimeout(() => {
               assinarPedidos()
               processarFilaTranscricoes(client, grupo, transcriberId)
-            }, 10_000)
+            }, espera)
           }
         })
     }

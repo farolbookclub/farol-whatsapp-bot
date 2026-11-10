@@ -100,6 +100,7 @@ async function postarNota(sock, registro) {
 // se o WhatsApp reconectar o socket troca, mas a inscrição do Realtime
 // continua a mesma — só precisa chamar isso 1x, não a cada reconexão.
 export function iniciarEscutaLeitura(getSock) {
+  let tentativa = 0
   function assinar() {
     const canal = supabase
       .channel(`leitura-realtime-${Date.now()}`)
@@ -112,14 +113,22 @@ export function iniciarEscutaLeitura(getSock) {
         if (sock) postarNota(sock, payload.new)
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') console.log('Escutando progresso de leitura em tempo real.')
+        if (status === 'SUBSCRIBED') {
+          tentativa = 0
+          console.log('Escutando progresso de leitura em tempo real.')
+        }
         // Sem isso, uma queda de conexão com o Supabase deixava esse canal
         // morto pro resto da vida do processo (só voltava reiniciando o
-        // bot). Agora tenta de novo sozinho em 10s.
+        // bot). Agora tenta de novo sozinho, com espera crescente (10s,
+        // 20s, 30s... até 5 min) — martelar sem parar numa rede instável
+        // a noite toda já causou outro problema (erro de pilha no cliente
+        // do Supabase), então não insiste sempre no mesmo ritmo.
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('Realtime (leitura) caiu:', status, '— tentando de novo em 10s')
+          tentativa++
+          const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
+          console.error('Realtime (leitura) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
           supabase.removeChannel(canal)
-          setTimeout(assinar, 10_000)
+          setTimeout(assinar, espera)
         }
       })
   }

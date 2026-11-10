@@ -85,6 +85,7 @@ export async function processarComandoTranscrevePV(m, jid) {
 // Escuta (Realtime, sem polling) quando uma transcrição fica pronta e posta
 // no grupo de origem, como resposta à mensagem do áudio.
 export function iniciarEscutaTranscricoes(getSock) {
+  let tentativa = 0
   function assinar() {
     const canal = supabase
       .channel(`transcricoes-realtime-${Date.now()}`)
@@ -105,14 +106,21 @@ export function iniciarEscutaTranscricoes(getSock) {
         }
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') console.log('Escutando transcrições de áudio em tempo real.')
+        if (status === 'SUBSCRIBED') {
+          tentativa = 0
+          console.log('Escutando transcrições de áudio em tempo real.')
+        }
         // Sem isso, uma queda de conexão com o Supabase deixava esse canal
-        // morto pro resto da vida do processo (só voltava reiniciando o
-        // bot). Agora tenta de novo sozinho em 10s.
+        // morto pro resto da vida do processo. Agora tenta de novo sozinho,
+        // com espera crescente (10s, 20s... até 5 min) — martelar sem
+        // parar numa rede instável já causou outro problema (erro de pilha
+        // no cliente do Supabase), então não insiste sempre no mesmo ritmo.
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.error('Realtime (transcrições) caiu:', status, '— tentando de novo em 10s')
+          tentativa++
+          const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
+          console.error('Realtime (transcrições) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
           supabase.removeChannel(canal)
-          setTimeout(assinar, 10_000)
+          setTimeout(assinar, espera)
         }
       })
   }
