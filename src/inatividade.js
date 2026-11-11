@@ -142,8 +142,8 @@ async function aniversarios(sock, hoje) {
     const nomeDe = await nomesExibicaoPorSignup(aniversariantes.map((m) => m.signup_id))
     const pessoas = aniversariantes.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups.apelido || m.signups.nome))}* (@${numeroDoJid(m.jid)})`)
     const texto = aniversariantes.length === 1
-      ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉\nParabéns! Que seu novo ciclo venha cheio de livros incríveis 💕`
-      : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉\nParabéns! Que o novo ciclo de vocês venha cheio de livros incríveis 💕`
+      ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉\nParabéns! Que seu novo ciclo seja cheio de saúde, felicidade e livros incríveis 💕`
+      : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉\nParabéns! Que o novo ciclo de vocês seja cheio de saúde, felicidade e livros incríveis 💕`
     try {
       await enviarMsg(sock, grupoJid, { text: texto, mentions: aniversariantes.map((m) => m.jid) })
     } catch (erro) {
