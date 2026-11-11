@@ -184,6 +184,38 @@ export async function checarPrazoLinks(sock) {
   }
 }
 
+// Quem foi aprovada mas nunca chamou o Faroleiro (nunca mandou /start) tem
+// 48h a partir da aprovação (signups.aprovado_em, marcado sozinho por
+// trigger assim que o status vira 'aprovado') pra começar — senão a vaga é
+// liberada. Só mexe em quem está "aprovado" de verdade e ainda sem nenhum
+// vínculo em whatsapp_membros (se já tem vínculo, é o prazo de
+// checarPrazoLinks que vale, não esse).
+export async function checarPrazoInicio() {
+  const limite = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+  const { data: pendentes } = await supabase
+    .from('signups')
+    .select('id')
+    .eq('status', 'aprovado')
+    .not('aprovado_em', 'is', null)
+    .lte('aprovado_em', limite)
+  if (!pendentes?.length) return
+
+  for (const s of pendentes) {
+    try {
+      const { data: vinculo } = await supabase.from('whatsapp_membros').select('jid').eq('signup_id', s.id).maybeSingle()
+      if (vinculo) continue // já chamou o bot em algum momento — não mexe
+
+      await supabase
+        .from('signups')
+        .update({ status: 'cancelado', cancelado_motivo: 'prazo_48h_nao_iniciou', cancelado_em: new Date().toISOString() })
+        .eq('id', s.id)
+        .eq('status', 'aprovado')
+    } catch (erro) {
+      console.error(`checarPrazoInicio ${s.id}:`, erro)
+    }
+  }
+}
+
 // Primeira etapa do guia (chamada logo depois de vincular a conta).
 // jaNosGrupos: true pra quem já foi adicionada direto nos grupos pela
 // Administração (não precisa do link no final, só do guia mesmo).

@@ -22,6 +22,9 @@ function textoMotivoCancelamento(motivo, detalhe) {
   if (motivo === 'prazo_48h_nao_completou') {
     return 'Sua inscrição foi cancelada porque você não entrou em todos os grupos dentro das 48h.'
   }
+  if (motivo === 'prazo_48h_nao_iniciou') {
+    return 'Sua inscrição foi cancelada porque você não iniciou a conversa com o Faroleiro dentro das 48h após a aprovação.'
+  }
   if (motivo === 'saida_voluntaria_grupo') {
     return 'Sua inscrição foi cancelada porque você saiu de um ou mais grupos do clube.'
   }

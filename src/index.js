@@ -13,7 +13,7 @@ import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
 import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
-import { iniciarGuia, tentarAvancarGuia, checarPrazoLinks } from './guia.js'
+import { iniciarGuia, tentarAvancarGuia, checarPrazoLinks, checarPrazoInicio } from './guia.js'
 import { perguntarIA } from './ia.js'
 import { processarChecagensPendentes } from './faltando.js'
 import { processarRemocoesPendentes } from './remocao.js'
@@ -394,6 +394,7 @@ async function connectToWhatsApp() {
       // Mesma lógica: roda já na conexão, não só depois de 15 min do setInterval.
       revisarMembrosIncompletos(sock).catch((erro) => console.error('revisar membros incompletas (inicial):', erro))
       checarPrazoLinks(sock).catch((erro) => console.error('checar prazo de links (inicial):', erro))
+      checarPrazoInicio().catch((erro) => console.error('checar prazo de início (inicial):', erro))
     }
   })
 
@@ -593,6 +594,13 @@ setInterval(() => {
 // passado isso sem completar, remove e libera a vaga. Checa a cada 30 min.
 setInterval(() => {
   if (sockAtual) checarPrazoLinks(sockAtual).catch((e) => console.error('checar prazo de links:', e))
+}, 30 * 60 * 1000)
+
+// Prazo de 48h pra chamar o bot (/start) depois de aprovada: passado isso
+// sem nunca ter iniciado a conversa, cancela e libera a vaga. Checa a cada
+// 30 min — não depende do sock (não manda mensagem, ela nunca vinculou jid).
+setInterval(() => {
+  checarPrazoInicio().catch((e) => console.error('checar prazo de início:', e))
 }, 30 * 60 * 1000)
 
 console.log(`Faroleiro (WhatsApp) iniciando... tópicos possíveis: ${TOPICOS.join(', ')}`)
