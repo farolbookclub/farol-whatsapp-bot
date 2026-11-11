@@ -87,42 +87,57 @@ export async function processarComandoTranscrevePV(m, jid) {
 export function iniciarEscutaTranscricoes(getSock) {
   let tentativa = 0
   function assinar() {
-    const canal = supabase
-      .channel(`transcricoes-realtime-${Date.now()}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transcricoes_pendentes' }, async (payload) => {
-        const row = payload.new
-        if (row.status !== 'concluido' || !row.transcricao) return
-        const sock = getSock()
-        if (!sock) return
-        try {
-          await enviarMsg(
-            sock,
-            row.group_jid,
-            { text: `*Transcrição*:\n_"${row.transcricao}"_` },
-            { quoted: { key: { remoteJid: row.group_jid, id: row.msg_id, participant: row.participant || undefined, fromMe: false }, message: { audioMessage: {} } } },
-          )
-        } catch (erro) {
-          console.error('postar transcrição:', erro)
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          tentativa = 0
-          console.log('Escutando transcrições de áudio em tempo real.')
-        }
-        // Sem isso, uma queda de conexão com o Supabase deixava esse canal
-        // morto pro resto da vida do processo. Agora tenta de novo sozinho,
-        // com espera crescente (10s, 20s... até 5 min) — martelar sem
-        // parar numa rede instável já causou outro problema (erro de pilha
-        // no cliente do Supabase), então não insiste sempre no mesmo ritmo.
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          tentativa++
-          const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
-          console.error('Realtime (transcrições) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
-          supabase.removeChannel(canal)
-          setTimeout(assinar, espera)
-        }
-      })
+    // Tudo dentro de um try/catch: o cliente de Realtime, numa rede muito
+    // instável, pode lançar uma exceção síncrona bem na hora de reinscrever
+    // — sem isso, essa exceção não tratada derrubava o processo inteiro do
+    // bot. Agora só loga e tenta de novo mais tarde, nunca mata o Faroleiro.
+    try {
+      const canal = supabase
+        .channel(`transcricoes-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transcricoes_pendentes' }, async (payload) => {
+          const row = payload.new
+          if (row.status !== 'concluido' || !row.transcricao) return
+          const sock = getSock()
+          if (!sock) return
+          try {
+            await enviarMsg(
+              sock,
+              row.group_jid,
+              { text: `*Transcrição*:\n_"${row.transcricao}"_` },
+              { quoted: { key: { remoteJid: row.group_jid, id: row.msg_id, participant: row.participant || undefined, fromMe: false }, message: { audioMessage: {} } } },
+            )
+          } catch (erro) {
+            console.error('postar transcrição:', erro)
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            tentativa = 0
+            console.log('Escutando transcrições de áudio em tempo real.')
+          }
+          // Sem isso, uma queda de conexão com o Supabase deixava esse canal
+          // morto pro resto da vida do processo. Agora tenta de novo sozinho,
+          // com espera crescente (10s, 20s... até 5 min) — martelar sem
+          // parar numa rede instável já causou outro problema (erro de pilha
+          // no cliente do Supabase), então não insiste sempre no mesmo ritmo.
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            tentativa++
+            const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
+            console.error('Realtime (transcrições) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
+            try {
+              supabase.removeChannel(canal)
+            } catch (erro) {
+              console.error('Realtime (transcrições) erro ao remover canal:', erro)
+            }
+            setTimeout(assinar, espera)
+          }
+        })
+    } catch (erro) {
+      tentativa++
+      const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
+      console.error('Realtime (transcrições) erro ao assinar:', erro, `— tentando de novo em ${Math.round(espera / 1000)}s`)
+      setTimeout(assinar, espera)
+    }
   }
   assinar()
 }

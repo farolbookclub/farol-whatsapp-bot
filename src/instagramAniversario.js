@@ -48,10 +48,8 @@ async function enviarFotoAniversario(sock, signupId, foto, apelido, instagram, g
   try {
     const admin = await jidAdmin()
     if (!admin) return
-    await enviarMsg(sock, admin, { image: foto, caption: `📸 ${apelido}` })
-    await enviarMsg(sock, admin, {
-      text: instagram ? `Instagram: ${instagram}` : 'Sem Instagram cadastrado.',
-    })
+    await enviarMsg(sock, admin, { image: foto })
+    await enviarMsg(sock, admin, { text: instagram || 'Sem Instagram cadastrado.' })
   } catch (erro) {
     console.error('enviar foto aniversário (admin):', erro)
   }
