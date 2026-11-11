@@ -98,6 +98,11 @@ async function grupoBatePapo() {
   return data?.group_jid || null
 }
 
+async function grupoAvisos() {
+  const { data } = await supabase.from('whatsapp_grupos').select('group_jid').eq('topico', 'avisos').eq('ativo', true).maybeSingle()
+  return data?.group_jid || null
+}
+
 // "A", "A e B", "A, B e C" — pra juntar nomes/menções numa frase só.
 function listaDisplay(itens) {
   if (itens.length === 1) return itens[0]
@@ -109,12 +114,12 @@ function listaDisplay(itens) {
 // vinculadas. Quem nasceu em 29/02 recebe em 28/02 nos anos não bissextos.
 // Se mais de uma fizer aniversário no mesmo dia, vai tudo numa mensagem só.
 async function aniversarios(sock, hoje) {
-  const grupoJid = await grupoBatePapo()
+  const grupoJid = await grupoAvisos()
   if (!grupoJid) return 0
 
   const { data: membros, error } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signup_id, signups (status, apelido, nome, aniversario)')
+    .select('jid, signup_id, signups (status, apelido, nome, aniversario, instagram)')
     .is('removido_em', null)
     .not('signup_id', 'is', null)
   if (error) throw error
@@ -145,7 +150,9 @@ async function aniversarios(sock, hoje) {
       console.error('parabéns:', erro)
     }
     for (const m of aniversariantes) {
-      postarAniversarioInstagram(m.signup_id).catch((erro) => console.error('instagram aniversário:', erro))
+      const apelido = nomeDe(m.signup_id, m.signups.apelido || m.signups.nome)
+      postarAniversarioInstagram(sock, m.signup_id, apelido, m.signups.instagram, grupoJid)
+        .catch((erro) => console.error('instagram aniversário:', erro))
     }
   }
 
@@ -192,12 +199,12 @@ function marcoDoClube(entrouEm, hoje) {
 // compartilhado com o Telegram). Quem só tem entrada aproximada
 // (entrada_texto, lista antiga) não entra na conta.
 async function aniversariosClube(sock, hoje) {
-  const grupoJid = await grupoBatePapo()
+  const grupoJid = await grupoAvisos()
   if (!grupoJid) return 0
 
   const { data: membros, error } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signup_id, signups (apelido, nome)')
+    .select('jid, signup_id, signups (apelido, nome, instagram)')
     .is('removido_em', null)
     .not('signup_id', 'is', null)
   if (error) throw error
@@ -254,7 +261,9 @@ async function aniversariosClube(sock, hoje) {
       console.error(`clube ${marco}:`, erro)
     }
     for (const m of grupo) {
-      postarTempoClubeInstagram(m.signup_id, marco).catch((erro) => console.error('instagram tempo de clube:', erro))
+      const apelido = nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome)
+      postarTempoClubeInstagram(sock, m.signup_id, marco, apelido, m.signups?.instagram, grupoJid)
+        .catch((erro) => console.error('instagram tempo de clube:', erro))
     }
   }
 
