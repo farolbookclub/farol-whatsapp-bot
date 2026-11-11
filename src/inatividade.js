@@ -2,7 +2,7 @@ import { supabase } from './supabase.js'
 import { avisarAdminErro } from './pushAdmin.js'
 import { enviarMsg } from './envio.js'
 import { avisarInstagramSaiu } from './instagramAviso.js'
-import { postarAniversarioInstagram, postarTempoClubeInstagram } from './instagramAniversario.js'
+import { enviarAniversario } from './instagramAniversario.js'
 
 // Verificação diária de inatividade (mesma regra do Telegram, Termo v1.1,
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
@@ -145,14 +145,15 @@ async function aniversarios(sock, hoje) {
       ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉\nParabéns! Que seu novo ciclo seja cheio de saúde, felicidade e livros incríveis 💕`
       : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉\nParabéns! Que o novo ciclo de vocês seja cheio de saúde, felicidade e livros incríveis 💕`
     try {
-      await enviarMsg(sock, grupoJid, { text: texto, mentions: aniversariantes.map((m) => m.jid) })
+      await enviarAniversario(sock, {
+        tipo: 'pessoal',
+        pessoas: aniversariantes.map((m) => ({ signupId: m.signup_id, instagram: m.signups.instagram })),
+        texto,
+        mentions: aniversariantes.map((m) => m.jid),
+        grupoJid,
+      })
     } catch (erro) {
       console.error('parabéns:', erro)
-    }
-    for (const m of aniversariantes) {
-      const apelido = nomeDe(m.signup_id, m.signups.apelido || m.signups.nome)
-      postarAniversarioInstagram(sock, m.signup_id, apelido, m.signups.instagram, grupoJid)
-        .catch((erro) => console.error('instagram aniversário:', erro))
     }
   }
 
@@ -255,15 +256,17 @@ async function aniversariosClube(sock, hoje) {
         `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ⚓`
 
     try {
-      await enviarMsg(sock, grupoJid, { text: texto, mentions: grupo.map((m) => m.jid) })
+      await enviarAniversario(sock, {
+        tipo: 'clube',
+        tempoTexto: `${marco} de Farol!`,
+        pessoas: grupo.map((m) => ({ signupId: m.signup_id, instagram: m.signups?.instagram })),
+        texto,
+        mentions: grupo.map((m) => m.jid),
+        grupoJid,
+      })
       postados += grupo.length
     } catch (erro) {
       console.error(`clube ${marco}:`, erro)
-    }
-    for (const m of grupo) {
-      const apelido = nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome)
-      postarTempoClubeInstagram(sock, m.signup_id, marco, apelido, m.signups?.instagram, grupoJid)
-        .catch((erro) => console.error('instagram tempo de clube:', erro))
     }
   }
 

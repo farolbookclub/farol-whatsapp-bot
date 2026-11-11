@@ -35,34 +35,52 @@ async function jidAdmin() {
   return data?.admin_jid_whatsapp || null
 }
 
-// Manda a foto pro grupo de Avisos (sem legenda — o texto dos parabéns já
-// vai numa mensagem separada, igual sempre foi) e, no privado da admin, a
-// mesma foto + o @ do Instagram da pessoa, pra ela postar manualmente.
-async function enviarFotoAniversario(sock, signupId, foto, apelido, instagram, grupoAvisosJid) {
-  if (!foto) return
-  try {
-    if (grupoAvisosJid) await enviarMsg(sock, grupoAvisosJid, { image: foto })
-  } catch (erro) {
-    console.error('enviar foto aniversário (avisos):', erro)
-  }
+// Foto + @ do Instagram juntos, numa mensagem só (legenda = o @), pra admin
+// postar manualmente. Só manda se tiver os dois (foto e instagram) — sem
+// instagram não tem nada pra ela postar, então nem vale a pena mandar.
+async function enviarFotoPV(sock, foto, instagram) {
+  if (!foto || !instagram) return
   try {
     const admin = await jidAdmin()
     if (!admin) return
-    await enviarMsg(sock, admin, { image: foto })
-    await enviarMsg(sock, admin, { text: instagram || 'Sem Instagram cadastrado.' })
+    await enviarMsg(sock, admin, { image: foto, caption: instagram })
   } catch (erro) {
     console.error('enviar foto aniversário (admin):', erro)
   }
 }
 
-export async function postarAniversarioInstagram(sock, signupId, apelido, instagram, grupoAvisosJid) {
-  if (!signupId) return
-  const foto = await gerarImagem(signupId, 'pessoal')
-  await enviarFotoAniversario(sock, signupId, foto, apelido, instagram, grupoAvisosJid)
-}
+// Parabéns de aniversário (pessoal ou tempo de clube), com foto de quem tem
+// cadastrada:
+// - 1 pessoa só: tenta mandar foto + texto juntos, numa mensagem só (foto
+//   como post, legenda = o texto de sempre) no grupo de Avisos. Se não tiver
+//   foto dela, manda só o texto (sem foto nenhuma), igual sempre foi.
+// - mais de 1 pessoa no mesmo dia: manda só o texto (no plural) no grupo —
+//   sem nenhuma foto ali, pra não poluir — e manda a foto de cada uma,
+//   separada, só no privado da admin (legenda = @ do instagram dela).
+export async function enviarAniversario(sock, { tipo, tempoTexto, pessoas, texto, mentions, grupoJid }) {
+  if (pessoas.length === 1) {
+    const p = pessoas[0]
+    const foto = await gerarImagem(p.signupId, tipo, tempoTexto)
+    try {
+      if (foto) {
+        await enviarMsg(sock, grupoJid, { image: foto, caption: texto, mentions })
+      } else {
+        await enviarMsg(sock, grupoJid, { text: texto, mentions })
+      }
+    } catch (erro) {
+      console.error('parabéns (grupo):', erro)
+    }
+    await enviarFotoPV(sock, foto, p.instagram)
+    return
+  }
 
-export async function postarTempoClubeInstagram(sock, signupId, marco, apelido, instagram, grupoAvisosJid) {
-  if (!signupId) return
-  const foto = await gerarImagem(signupId, 'clube', `${marco} de Farol!`)
-  await enviarFotoAniversario(sock, signupId, foto, apelido, instagram, grupoAvisosJid)
+  try {
+    await enviarMsg(sock, grupoJid, { text: texto, mentions })
+  } catch (erro) {
+    console.error('parabéns (grupo):', erro)
+  }
+  for (const p of pessoas) {
+    const foto = await gerarImagem(p.signupId, tipo, tempoTexto)
+    await enviarFotoPV(sock, foto, p.instagram)
+  }
 }
