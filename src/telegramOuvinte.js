@@ -230,14 +230,58 @@ export async function iniciarOuvinteTelegram() {
 
   // Realtime: novo pedido de transcrição -> entra na fila (só se achou o bot).
   if (transcriberId) {
+    const MAX_TENTATIVAS_REALTIME = 20
     let tentativaPedidos = 0
-    function assinarPedidos() {
-      // Tudo dentro de um try/catch: o cliente de Realtime, numa rede muito
-      // instável, pode lançar uma exceção síncrona bem na hora de
-      // reinscrever — sem isso, essa exceção não tratada derrubava o
-      // processo inteiro do bot. Agora só loga e tenta de novo mais tarde.
+    let canalAtual = null
+    let tentativaAgendada = false
+
+    function parar(motivo) {
+      console.error(`[Telegram] Realtime (pedidos de transcrição) desistiu depois de ${tentativaPedidos} tentativas — ${motivo}. Precisa reiniciar o bot.`)
+      avisarAdminErro(`Realtime de pedidos de transcrição parou de tentar reconectar (${tentativaPedidos}x) — reinicie o bot.`)
+    }
+
+    // Ver o comentário equivalente em avisoLeitura.js: o socket do Realtime
+    // reconecta sozinho por baixo, e isso pode disparar várias tentativas
+    // de reinscrição quase juntas — sem essa proteção (1 tentativa
+    // agendada por vez, esperar a remoção do canal antigo terminar antes
+    // de criar o próximo), isso empilhava canais e timers até estourar a
+    // memória ("JavaScript heap out of memory").
+    function agendarTentativa() {
+      if (tentativaAgendada) return
+      tentativaAgendada = true
+      tentativaPedidos++
+      if (tentativaPedidos > MAX_TENTATIVAS_REALTIME) {
+        tentativaAgendada = false
+        return parar('muitas falhas seguidas')
+      }
+      const espera = Math.min(10_000 * tentativaPedidos, 5 * 60 * 1000)
+      console.error('[Telegram] Realtime (pedidos de transcrição) caiu', `— tentando de novo em ${Math.round(espera / 1000)}s`)
+      setTimeout(() => {
+        tentativaAgendada = false
+        assinarPedidos()
+        processarFilaTranscricoes(client, grupo, transcriberId)
+      }, espera)
+    }
+
+    async function limparCanalAtual() {
+      if (!canalAtual) return
+      const c = canalAtual
+      canalAtual = null
       try {
-        const canal = supabase
+        await supabase.removeChannel(c)
+      } catch (erro) {
+        console.error('[Telegram] Realtime (pedidos de transcrição) erro ao remover canal:', erro)
+      }
+    }
+
+    // Tudo dentro de um try/catch: o cliente de Realtime, numa rede muito
+    // instável, pode lançar uma exceção síncrona bem na hora de
+    // reinscrever — sem isso, essa exceção não tratada derrubava o
+    // processo inteiro do bot. Agora só loga e tenta de novo mais tarde.
+    async function assinarPedidos() {
+      await limparCanalAtual()
+      try {
+        canalAtual = supabase
           .channel(`transcricoes-pedido-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transcricoes_pendentes' }, (payload) => {
             if (payload.new.status === 'pendente') processarFilaTranscricoes(client, grupo, transcriberId)
@@ -247,37 +291,13 @@ export async function iniciarOuvinteTelegram() {
               tentativaPedidos = 0
               console.log('[Telegram] Escutando pedidos de transcrição em tempo real.')
             }
-            // Sem isso, uma queda de conexão com o Supabase deixava esse canal
-            // morto pro resto da vida do processo (só voltava reiniciando o
-            // bot) — os áudios ficavam parados em "pendente" pra sempre.
-            // Agora tenta de novo sozinho, com espera crescente (10s, 20s...
-            // até 5 min) — martelar sem parar numa rede instável já causou
-            // outro problema (erro de pilha no cliente do Supabase), então
-            // não insiste sempre no mesmo ritmo. Revarre o que ficou parado
-            // nesse meio-tempo.
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-              tentativaPedidos++
-              const espera = Math.min(10_000 * tentativaPedidos, 5 * 60 * 1000)
-              console.error('[Telegram] Realtime (pedidos de transcrição) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
-              try {
-                supabase.removeChannel(canal)
-              } catch (erro) {
-                console.error('[Telegram] Realtime (pedidos de transcrição) erro ao remover canal:', erro)
-              }
-              setTimeout(() => {
-                assinarPedidos()
-                processarFilaTranscricoes(client, grupo, transcriberId)
-              }, espera)
+              agendarTentativa()
             }
           })
       } catch (erro) {
-        tentativaPedidos++
-        const espera = Math.min(10_000 * tentativaPedidos, 5 * 60 * 1000)
-        console.error('[Telegram] Realtime (pedidos de transcrição) erro ao assinar:', erro, `— tentando de novo em ${Math.round(espera / 1000)}s`)
-        setTimeout(() => {
-          assinarPedidos()
-          processarFilaTranscricoes(client, grupo, transcriberId)
-        }, espera)
+        console.error('[Telegram] Realtime (pedidos de transcrição) erro ao assinar:', erro)
+        agendarTentativa()
       }
     }
     assinarPedidos()

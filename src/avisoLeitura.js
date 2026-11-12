@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { enviarMsg } from './envio.js'
+import { avisarAdminErro } from './pushAdmin.js'
 
 const SITE_MEMBRAS = 'http://membrosfarol.vercel.app/'
 
@@ -103,16 +104,68 @@ async function postarNota(sock, registro) {
 // Recebe uma função que devolve o socket atual (não o socket fixo), porque
 // se o WhatsApp reconectar o socket troca, mas a inscrição do Realtime
 // continua a mesma — só precisa chamar isso 1x, não a cada reconexão.
+const MAX_TENTATIVAS_REALTIME = 20
+
+// O cliente de Realtime do Supabase já reconecta o SOCKET sozinho por baixo
+// (a cada poucos segundos, com seu próprio backoff) — mas não reinscreve os
+// canais (channels) automaticamente depois disso; quem decide refazer o
+// canal é a gente. O problema: cada reconexão do socket avisa TODOS os
+// canais ainda registrados de que deu erro, inclusive canais antigos que a
+// gente já tinha mandado remover mas cuja remoção (assíncrona) ainda não
+// tinha terminado. Numa rede instável por muitas horas, isso disparava
+// várias tentativas de reinscrição quase ao mesmo tempo, cada uma criando
+// outro canal novo — acumulando canais e timers até estourar a memória
+// ("JavaScript heap out of memory"). As duas proteções abaixo (só 1
+// tentativa agendada por vez, e esperar a remoção terminar antes de criar
+// o próximo canal) existem só por causa disso.
 export function iniciarEscutaLeitura(getSock) {
   let tentativa = 0
-  function assinar() {
-    // Tudo dentro de um try/catch: o cliente de Realtime, numa rede muito
-    // instável, pode lançar uma exceção síncrona bem na hora de reinscrever
-    // (ex.: "cannot add callbacks... after subscribe()") — sem isso, essa
-    // exceção não tratada derrubava o processo inteiro do bot. Agora só
-    // loga e tenta de novo mais tarde, nunca mata o Faroleiro.
+  let canalAtual = null
+  let tentativaAgendada = false
+
+  function parar(motivo) {
+    console.error(`Realtime (leitura) desistiu depois de ${tentativa} tentativas — ${motivo}. Precisa reiniciar o bot.`)
+    avisarAdminErro(`Realtime de leitura parou de tentar reconectar (${tentativa}x) — reinicie o bot.`)
+  }
+
+  // Só deixa 1 tentativa agendada por vez — se o status de erro disparar
+  // várias vezes seguidas (reconexões do socket por baixo), as repetições
+  // são ignoradas em vez de empilhar mais uma tentativa cada uma.
+  function agendarTentativa() {
+    if (tentativaAgendada) return
+    tentativaAgendada = true
+    tentativa++
+    if (tentativa > MAX_TENTATIVAS_REALTIME) {
+      tentativaAgendada = false
+      return parar('muitas falhas seguidas')
+    }
+    const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
+    console.error('Realtime (leitura) caiu', `— tentando de novo em ${Math.round(espera / 1000)}s`)
+    setTimeout(() => {
+      tentativaAgendada = false
+      assinar()
+    }, espera)
+  }
+
+  async function limparCanalAtual() {
+    if (!canalAtual) return
+    const c = canalAtual
+    canalAtual = null
     try {
-      const canal = supabase
+      await supabase.removeChannel(c)
+    } catch (erro) {
+      console.error('Realtime (leitura) erro ao remover canal:', erro)
+    }
+  }
+
+  // Tudo dentro de um try/catch: o cliente de Realtime, numa rede muito
+  // instável, pode lançar uma exceção síncrona bem na hora de reinscrever
+  // (ex.: "cannot add callbacks... after subscribe()") — sem isso, essa
+  // exceção não tratada derrubava o processo inteiro do bot.
+  async function assinar() {
+    await limparCanalAtual()
+    try {
+      canalAtual = supabase
         .channel(`leitura-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'progresso_leitura' }, (payload) => {
           const sock = getSock()
@@ -127,29 +180,13 @@ export function iniciarEscutaLeitura(getSock) {
             tentativa = 0
             console.log('Escutando progresso de leitura em tempo real.')
           }
-          // Sem isso, uma queda de conexão com o Supabase deixava esse canal
-          // morto pro resto da vida do processo (só voltava reiniciando o
-          // bot). Agora tenta de novo sozinho, com espera crescente (10s,
-          // 20s, 30s... até 5 min) — martelar sem parar numa rede instável
-          // a noite toda já causou outro problema (erro de pilha no cliente
-          // do Supabase), então não insiste sempre no mesmo ritmo.
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            tentativa++
-            const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
-            console.error('Realtime (leitura) caiu:', status, `— tentando de novo em ${Math.round(espera / 1000)}s`)
-            try {
-              supabase.removeChannel(canal)
-            } catch (erro) {
-              console.error('Realtime (leitura) erro ao remover canal:', erro)
-            }
-            setTimeout(assinar, espera)
+            agendarTentativa()
           }
         })
     } catch (erro) {
-      tentativa++
-      const espera = Math.min(10_000 * tentativa, 5 * 60 * 1000)
-      console.error('Realtime (leitura) erro ao assinar:', erro, `— tentando de novo em ${Math.round(espera / 1000)}s`)
-      setTimeout(assinar, espera)
+      console.error('Realtime (leitura) erro ao assinar:', erro)
+      agendarTentativa()
     }
   }
   assinar()
