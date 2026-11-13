@@ -25,17 +25,18 @@ export async function avisarInstagramEntrou(sock, signupId, apelido, instagram) 
   }
 }
 
-// Avisa quando alguém sai/é removida do clube pelo próprio bot — só se ela
-// já tinha sido marcada como "adicionada" no grupo do Instagram (senão não
-// tem nada pra remover, não precisa incomodar a admin à toa).
+// Avisa quando alguém sai/é removida do clube pelo próprio bot, pra admin
+// lembrar de tirar do grupo do Instagram (se tiver colocado — ela adiciona
+// direto por fora, sem confirmar pelo WhatsApp, então não dá pra confiar
+// num status "adicionada"; manda sempre que tiver Instagram cadastrado).
 export async function avisarInstagramSaiu(sock, signupId) {
   if (!signupId) return
-  const { data: s } = await supabase.from('signups').select('apelido, nome, instagram_status').eq('id', signupId).maybeSingle()
-  if (!s || s.instagram_status !== 'adicionada') return
+  const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
+  if (!s?.instagram) return
   const jid = await adminJid()
   if (jid) {
     try {
-      await enviarMsg(sock, jid, { text: `📸 ${s.apelido || s.nome} saiu/foi removida do clube — se ainda estiver no grupo do Instagram, tira de lá.` })
+      await enviarMsg(sock, jid, { text: `📸 ${s.apelido || s.nome} (${s.instagram}) saiu/foi removida do clube — se ainda estiver no grupo do Instagram, tira de lá.` })
     } catch (erro) {
       console.error('avisar instagram (saiu):', erro)
     }
