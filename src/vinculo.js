@@ -1,8 +1,6 @@
 import { supabase } from './supabase.js'
 import { avisarInstagramSaiu } from './instagramAviso.js'
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 // Texto pra cada motivo de cancelamento possível (cancelado_motivo +, pra
 // quebra_regra, o começo de cancelado_detalhe — que guarda o rótulo da
 // regra escolhida no painel: "Ausência virtual", "3 encontros sem ir" etc.).
@@ -65,50 +63,11 @@ export async function marcarEntrouMembras(signupId) {
   if (error) console.error('marcarEntrouMembras:', error.message)
 }
 
-// Liga o número de WhatsApp (jid) a uma inscrição aprovada, a partir do mesmo
-// token usado no link "Minha inscrição" (manda "/start <token>" no privado).
-// Link de uso único por inscrição: se já tiver outro jid vinculado, recusa.
-export async function vincularConta(jid, token) {
-  if (!UUID.test(token)) return null
-
-  const { data: cadastro, error: erroCadastro } = await supabase
-    .from('signups')
-    .select('id, status, nome, apelido, formato, cancelado_motivo, cancelado_detalhe')
-    .eq('confirmation_token', token)
-    .maybeSingle()
-  if (erroCadastro) console.error('vincularConta (buscar signup):', erroCadastro.message, erroCadastro.code)
-  if (!cadastro) return { ok: false, texto: 'Link inválido. Abra *Minha inscrição* e use o botão de lá.' }
-  if (cadastro.status !== 'aprovado') {
-    return {
-      ok: false,
-      texto: cadastro.status === 'cancelado'
-        ? `${textoMotivoCancelamento(cadastro.cancelado_motivo, cadastro.cancelado_detalhe)} Para voltar, faça uma nova adesão no site do Farol. A aprovação depende de vaga disponível.`
-        : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e toque no botão de novo.',
-    }
-  }
-
-  const { data: jaVinculado } = await supabase.from('whatsapp_membros').select('jid').eq('signup_id', cadastro.id).maybeSingle()
-  if (jaVinculado && jaVinculado.jid !== jid) {
-    return { ok: false, texto: 'Esse link já foi usado em outro número. Trocou de número? Fale com a Administração.' }
-  }
-
-  // removido_em explícito: se esse número já foi removido antes, o upsert
-  // (por padrão só atualiza as colunas informadas) deixaria a data antiga
-  // ali, e ela ficaria invisível pro bot pra sempre mesmo depois de vinculada de novo.
-  const { error } = await supabase
-    .from('whatsapp_membros')
-    .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, removido_em: null }, { onConflict: 'jid' })
-  if (error) throw error
-  await marcarEntrouMembras(cadastro.id)
-
-  const apelido = await nomeExibicaoDoSignup(cadastro.id, cadastro.apelido || cadastro.nome)
-  return { ok: true, apelido, formato: cadastro.formato }
-}
-
-// Mesma coisa que vincularConta, mas pelo código de 3 dígitos (codigo_entrada)
-// — mensagem natural "sou a integrante 123", em vez do link com o token em
-// UUID (que o WhatsApp confundia com chave Pix). Libera o código depois de
-// usado, pra poder ser reaproveitado por outra pessoa no futuro.
+// Liga o número de WhatsApp (jid) a uma inscrição aprovada, a partir do
+// código de 3 dígitos (codigo_entrada) — mensagem natural "sou a integrante
+// 123" no privado. Esse código é único e fixo pra cada inscrição, pra
+// sempre (nunca é reaproveitado, nem se ela saída/cancelada). Link de uso
+// único: se já tiver outro jid vinculado, recusa.
 export async function vincularContaPorCodigo(jid, codigo) {
   if (!/^\d{3}$/.test(codigo)) return null
 
@@ -138,7 +97,6 @@ export async function vincularContaPorCodigo(jid, codigo) {
     .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, removido_em: null }, { onConflict: 'jid' })
   if (error) throw error
   await marcarEntrouMembras(cadastro.id)
-  await supabase.from('signups').update({ codigo_entrada: null }).eq('id', cadastro.id)
 
   const apelido = await nomeExibicaoDoSignup(cadastro.id, cadastro.apelido || cadastro.nome)
   return { ok: true, apelido, formato: cadastro.formato }
