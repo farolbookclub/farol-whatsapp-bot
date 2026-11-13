@@ -248,12 +248,12 @@ async function aniversariosClube(sock, hoje) {
     const singular = grupo.length === 1
 
     const texto = singular
-      ? `🎉 A ${pessoas[0]} completa ${marco} de Farol! 🥳\n` +
+      ? `🎉 Hoje, a ${pessoas[0]} completa ${marco} de Farol! 🥳\n` +
         `Parabéns e obrigada por estar com a gente 💖\n` +
-        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ⚓`
-      : `🎉 ${listaDisplay(pessoas)} completam ${marco} de Farol! 🥳\n` +
+        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ✨`
+      : `🎉 Hoje, ${listaDisplay(pessoas)} completam ${marco} de Farol! 🥳\n` +
         `Parabéns e obrigada por estarem com a gente 💖\n` +
-        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ⚓`
+        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ✨`
 
     try {
       await enviarAniversario(sock, {
