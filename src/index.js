@@ -4,7 +4,7 @@ import qrcodeTerminal from 'qrcode-terminal'
 import { enviarMsg, limparEnviosAntigos } from './envio.js'
 import { grupoAtivo, identificarTopico, TOPICOS } from './grupos.js'
 import { guardarMensagem, limparMensagensAntigas } from './mensagens.js'
-import { vincularConta, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar, apresentacaoDoSignup } from './vinculo.js'
+import { vincularConta, vincularContaPorCodigo, inscricaoDoJid, vincularPorNumero, registrarInteracao, desvincularECancelar, apresentacaoDoSignup } from './vinculo.js'
 import { supabase } from './supabase.js'
 import { WHATSAPP_PHONE_NUMBER } from './config.js'
 import { iniciarEscutaLeitura, postarProgresso } from './avisoLeitura.js'
@@ -262,6 +262,21 @@ async function handleDM(sock, m, jid) {
   const comandoStart = texto.match(/^\/start\s+([0-9a-f-]{36})$/i)
   if (comandoStart) {
     const resultado = await vincularConta(jid, comandoStart[1])
+    if (!resultado) return
+    if (!resultado.ok) {
+      await enviarMsg(sock, jid, { text: resultado.texto })
+      return
+    }
+    await iniciarGuia(sock, jid, resultado.apelido)
+    return
+  }
+
+  // Mensagem nova do link "Minha inscrição" (substitui o "/start <token>",
+  // que o WhatsApp tava confundindo com chave Pix). O regex acima continua
+  // valendo pra links antigos já copiados antes dessa mudança.
+  const comandoCodigo = texto.match(/integrante\s*(\d{3})\b/i)
+  if (comandoCodigo) {
+    const resultado = await vincularContaPorCodigo(jid, comandoCodigo[1])
     if (!resultado) return
     if (!resultado.ok) {
       await enviarMsg(sock, jid, { text: resultado.texto })

@@ -105,6 +105,45 @@ export async function vincularConta(jid, token) {
   return { ok: true, apelido, formato: cadastro.formato }
 }
 
+// Mesma coisa que vincularConta, mas pelo código de 3 dígitos (codigo_entrada)
+// — mensagem natural "sou a integrante 123", em vez do link com o token em
+// UUID (que o WhatsApp confundia com chave Pix). Libera o código depois de
+// usado, pra poder ser reaproveitado por outra pessoa no futuro.
+export async function vincularContaPorCodigo(jid, codigo) {
+  if (!/^\d{3}$/.test(codigo)) return null
+
+  const { data: cadastro, error: erroCadastro } = await supabase
+    .from('signups')
+    .select('id, status, nome, apelido, formato, cancelado_motivo, cancelado_detalhe')
+    .eq('codigo_entrada', codigo)
+    .maybeSingle()
+  if (erroCadastro) console.error('vincularContaPorCodigo (buscar signup):', erroCadastro.message, erroCadastro.code)
+  if (!cadastro) return { ok: false, texto: 'Código inválido. Abra *Minha inscrição* e use o botão de lá.' }
+  if (cadastro.status !== 'aprovado') {
+    return {
+      ok: false,
+      texto: cadastro.status === 'cancelado'
+        ? `${textoMotivoCancelamento(cadastro.cancelado_motivo, cadastro.cancelado_detalhe)} Para voltar, faça uma nova adesão no site do Farol. A aprovação depende de vaga disponível.`
+        : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e toque no botão de novo.',
+    }
+  }
+
+  const { data: jaVinculado } = await supabase.from('whatsapp_membros').select('jid').eq('signup_id', cadastro.id).maybeSingle()
+  if (jaVinculado && jaVinculado.jid !== jid) {
+    return { ok: false, texto: 'Esse código já foi usado em outro número. Trocou de número? Fale com a Administração.' }
+  }
+
+  const { error } = await supabase
+    .from('whatsapp_membros')
+    .upsert({ jid, signup_id: cadastro.id, entrou_em: new Date().toISOString().slice(0, 10), guia_etapa: 1, removido_em: null }, { onConflict: 'jid' })
+  if (error) throw error
+  await marcarEntrouMembras(cadastro.id)
+  await supabase.from('signups').update({ codigo_entrada: null }).eq('id', cadastro.id)
+
+  const apelido = await nomeExibicaoDoSignup(cadastro.id, cadastro.apelido || cadastro.nome)
+  return { ok: true, apelido, formato: cadastro.formato }
+}
+
 export function normalizarNumero(numero) {
   const bruto = String(numero || '').trim()
   if (!bruto) return null
