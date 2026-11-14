@@ -153,7 +153,8 @@ async function handleGroupMessage(sock, m, groupJid) {
   // "SPOILER ..." no tópico de leitura: some do grupo, guarda só pra quem
   // pedir no privado (não tem como "borrar" mensagem no WhatsApp).
   if (topico === 'leitura' && PADRAO_SPOILER.test(texto)) {
-    const apelido = m.pushName || 'alguém'
+    const inscricao = await inscricaoDoJid(participant)
+    const apelido = inscricao?.apelido || m.pushName || 'alguém'
     try {
       await sock.sendMessage(groupJid, { delete: m.key })
     } catch (erro) {
