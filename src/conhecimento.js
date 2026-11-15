@@ -34,7 +34,7 @@ SITE DAS MEMBRAS: https://membrosfarol.vercel.app/
 - Também tem: regrinhas, leituras anteriores, encontrinhos, membras (apresentação, aniversários e mais), ferramentas, arquivos e parceiros.
 
 REGRINHAS
-- Spoiler: antes de comentar algo do livro, escrever SPOILER + onde está (capítulo ou porcentagem) + o comentário, no grupo Leitura do mês. O Faroleiro apaga a mensagem do grupo sozinho e guarda pra quem pedir /spoiler no privado. Foto ou vídeo com spoiler: mandar como visualização única. Spoiler sem aviso gera lembrete da regra; na 3ª vez a participação pode ser encerrada.
+- Spoiler: antes de comentar algo do livro, escrever SPOILER + onde está (capítulo ou porcentagem) + o comentário, no grupo Leitura do mês. Foto ou vídeo com spoiler: mandar como visualização única. Spoiler sem aviso gera lembrete da regra; na 3ª vez a participação pode ser encerrada.
 - Conversa: interagir ao menos uma vez a cada 30 dias em algum grupo do WhatsApp (qualquer mensagem ou reação conta, até um "bom dia"). Por volta do 20º dia sem interagir, o Faroleiro manda um lembrete no privado; com 30 dias seguidos sem interagir, a pessoa é removida automaticamente e perde a vaga do Presencial. Pra voltar, é só fazer uma nova adesão pelo site.
 - Presencial: avisar sempre que for faltar. Três faltas seguidas podem fazer perder a vaga do Presencial (continua no Online).
 - Imagem: aparecer em fotos é opcional; é só avisar a Administração, sem precisar justificar.

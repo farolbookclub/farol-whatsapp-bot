@@ -12,7 +12,6 @@ import { processarAudioGrupo, processarComandoTranscreve, processarAudioPV, proc
 import { iniciarOuvinteTelegram } from './telegramOuvinte.js'
 import { processarAvisosPendentes } from './avisos.js'
 import { processarAvisosAgendados } from './avisosAgendados.js'
-import { PADRAO_SPOILER, guardarSpoiler } from './spoiler.js'
 import { iniciarGuia, tentarAvancarGuia, checarPrazoLinks, checarPrazoInicio } from './guia.js'
 import { perguntarIA } from './ia.js'
 import { processarChecagensPendentes } from './faltando.js'
@@ -149,21 +148,6 @@ async function handleGroupMessage(sock, m, groupJid) {
   if (!topico) return
 
   await registrarInteracao(participant)
-
-  // "SPOILER ..." no tópico de leitura: some do grupo, guarda só pra quem
-  // pedir no privado (não tem como "borrar" mensagem no WhatsApp).
-  if (topico === 'leitura' && PADRAO_SPOILER.test(texto)) {
-    const inscricao = await inscricaoDoJid(participant)
-    const apelido = inscricao?.apelido || m.pushName || 'alguém'
-    try {
-      await sock.sendMessage(groupJid, { delete: m.key })
-    } catch (erro) {
-      console.error('apagar spoiler:', erro)
-    }
-    await guardarSpoiler({ groupJid, topico, apelido, texto })
-    await enviarMsg(sock, groupJid, { text: `🤫 ${apelido} comentou um spoiler sem avisar. Apaguei a mensagem.` })
-    return
-  }
 
   if (m.message?.audioMessage) {
     await processarAudioGrupo(m, groupJid, topico)
