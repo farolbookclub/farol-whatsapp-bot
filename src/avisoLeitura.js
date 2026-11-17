@@ -57,7 +57,7 @@ async function textoNota(r, livro) {
   const quem = await resolverMencao(r.nome_publico)
   const nota = String(Number(r.rating)).replace('.', ',')
   let texto = `⭐ ${quem.texto} avaliou "${livro}": nota ${nota}`
-  if (r.is_favorite) texto += ' ❤️'
+  if (r.is_favorite) texto += ' + favoritado ❤️'
   return { texto, mention: quem.mention }
 }
 
