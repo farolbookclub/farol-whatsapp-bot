@@ -8,8 +8,8 @@ import { enviarAniversario } from './instagramAniversario.js'
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
 // clube) no grupo Bate-papo do WhatsApp.
 //
-// - Dia 20 (bot_config.lembrete_dias): lembrete no privado.
-// - Depois de 30 dias (bot_config.dias_limite), e só se o lembrete já saiu:
+// - Dia 10 (bot_config.lembrete_dias): lembrete no privado.
+// - Depois de 20 dias (bot_config.dias_limite), e só se o lembrete já saiu:
 //   remove de todos os grupos, cancela a inscrição (libera a vaga) e avisa
 //   no privado.
 // - Nada é dito nos grupos sobre isso.

@@ -9,7 +9,7 @@ import { avisarInstagramSaiu } from './instagramAviso.js'
 function textoMotivoCancelamento(motivo, detalhe) {
   const d = detalhe || ''
   if (motivo === 'inatividade' || d.startsWith('Ausência virtual')) {
-    return 'Sua inscrição foi cancelada por inatividade: foram 30 dias sem interagir no clube.'
+    return 'Sua inscrição foi cancelada por inatividade: foram 20 dias sem interagir no clube.'
   }
   if (d.startsWith('3 encontros sem ir')) {
     return 'Sua inscrição foi cancelada porque você faltou a 3 encontros presenciais seguidos.'
