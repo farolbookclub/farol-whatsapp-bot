@@ -22,6 +22,11 @@ import { enviarAniversario } from './instagramAniversario.js'
 //
 // Roda 1x por dia (checada por data, não por intervalo) via
 // processarInatividadeDiaria(sock), chamada de um setInterval mais curto.
+//
+// Pausa de fim de ano: bot_config.pausa_inatividade_de/ate (período em que a
+// regra não vale pra ninguém) e pausa_inatividade_reinicio (piso da
+// referência de "última interação" — faz a contagem recomeçar dali pra
+// frente, como se todo mundo tivesse interagido nesse dia).
 
 function hojeSP() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
@@ -467,6 +472,15 @@ export async function processarInatividadeDiaria(sock) {
     return
   }
 
+  // Pausa de fim de ano (bot_config.pausa_inatividade_de/ate): ignora a regra
+  // pra TODAS nesse período, sem exceção (nem admin, nem isentas de sempre —
+  // elas já não seriam cobradas mesmo). Nenhum lembrete nem pedido de
+  // remoção sai nesses dias.
+  if (config.pausa_inatividade_de && config.pausa_inatividade_ate && hoje >= config.pausa_inatividade_de && hoje <= config.pausa_inatividade_ate) {
+    await supabase.from('bot_config').update({ inatividade_checada_em_whatsapp: hoje }).eq('id', 1)
+    return
+  }
+
   const teste = config.modo_teste
   const modo = teste ? 'teste' : 'real'
 
@@ -496,7 +510,7 @@ export async function processarInatividadeDiaria(sock) {
   const logs = []
   for (const m of membros ?? []) {
     const numero = numeroDoJid(m.jid)
-    const referencia = maisRecente(m.ultima_interacao, m.entrou_em, config.lancamento_em)
+    const referencia = maisRecente(m.ultima_interacao, m.entrou_em, config.lancamento_em, config.pausa_inatividade_reinicio)
     const dias = diasEntre(referencia, hoje)
     const base = { jid: m.jid, signup_id: m.signup_id, ultima_interacao: m.ultima_interacao, data_referencia: referencia, modo }
 
