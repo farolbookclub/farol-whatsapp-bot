@@ -175,6 +175,16 @@ export function iniciarEscutaLeitura(getSock) {
           const sock = getSock()
           if (sock) postarNota(sock, payload.new)
         })
+        // A avaliação final quase sempre é um UPDATE (upsert em cima da linha
+        // criada quando a pessoa marcou "lendo") — só o primeiro INSERT (sem
+        // nota) não bastava. Só avisa na transição null → com nota (não
+        // reavisa se ela só editar a nota ou o favorito depois).
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'public_ratings' }, (payload) => {
+          const sock = getSock()
+          const notaNova = payload.new?.rating !== null && payload.new?.rating !== undefined
+          const notaAntes = payload.old?.rating !== null && payload.old?.rating !== undefined
+          if (sock && notaNova && !notaAntes) postarNota(sock, payload.new)
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             tentativa = 0
