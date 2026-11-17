@@ -23,8 +23,6 @@ import { enviarAniversario } from './instagramAniversario.js'
 // Roda 1x por dia (checada por data, não por intervalo) via
 // processarInatividadeDiaria(sock), chamada de um setInterval mais curto.
 
-const SITE_URL = 'https://biofarol.vercel.app'
-
 function hojeSP() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
 }
@@ -43,8 +41,7 @@ function textoLembrete(dias, faltam) {
 }
 
 function textoRemocao(limite) {
-  return `Você ficou ${limite} dias sem interagir e foi removida dos grupos do Farol.\n` +
-    `Quer voltar? Faça uma nova adesão: ${SITE_URL}`
+  return `Como você ficou ${limite} dias sem interagir com o clube, sua participação foi encerrada, conforme as regras do Farol. Agradecemos pela compreensão!`
 }
 
 function escaparMarcacao(texto) {
