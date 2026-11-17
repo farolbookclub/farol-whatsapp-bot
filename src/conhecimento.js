@@ -37,7 +37,6 @@ REGRINHAS
 - Spoiler: antes de comentar algo do livro, escrever SPOILER + onde está (capítulo ou porcentagem) + o comentário, no grupo Leitura do mês. Foto ou vídeo com spoiler: mandar como visualização única. Spoiler sem aviso gera lembrete da regra; na 3ª vez a participação pode ser encerrada.
 - Conversa: interagir ao menos uma vez a cada 30 dias em algum grupo do WhatsApp (qualquer mensagem ou reação conta, até um "bom dia"). Por volta do 20º dia sem interagir, o Faroleiro manda um lembrete no privado; com 30 dias seguidos sem interagir, a pessoa é removida automaticamente e perde a vaga do Presencial. Pra voltar, é só fazer uma nova adesão pelo site.
 - Presencial: avisar sempre que for faltar. Três faltas seguidas podem fazer perder a vaga do Presencial (continua no Online).
-- Imagem: aparecer em fotos é opcional; é só avisar a Administração, sem precisar justificar.
 - Respeito acima de tudo: discordar sobre livros é normal, mas sempre com carinho e respeito, entre todas e com a Administração.
 - Situações graves (ameaça, assédio, discriminação, exposição de dados) podem levar à remoção imediata.
 
