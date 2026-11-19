@@ -14,7 +14,7 @@ function esperar(ms) {
 export async function processarAvisosPendentes(sock) {
   const { data: aviso } = await supabase
     .from('whatsapp_avisos')
-    .select('id, mensagem, midia_url, midia_mime, midia_nome')
+    .select('id, mensagem, midia_url, midia_mime, midia_nome, destinatarios')
     .eq('status', 'pendente')
     .order('criado_em', { ascending: true })
     .limit(1)
@@ -23,7 +23,11 @@ export async function processarAvisosPendentes(sock) {
 
   await supabase.from('whatsapp_avisos').update({ status: 'processando' }).eq('id', aviso.id)
 
-  const { data: signups } = await supabase.from('signups').select('id, apelido, nome').eq('status', 'aprovado')
+  // destinatarios (lista de signup_id) é opcional: se vazio/nulo, manda pra
+  // todas as aprovadas (comportamento de sempre); se tiver, manda só pra elas.
+  let query = supabase.from('signups').select('id, apelido, nome').eq('status', 'aprovado')
+  if (aviso.destinatarios?.length) query = query.in('id', aviso.destinatarios)
+  const { data: signups } = await query
   const { data: membros } = await supabase.from('whatsapp_membros').select('jid, signup_id').is('removido_em', null)
   const jidPorSignup = new Map((membros ?? []).map((m) => [m.signup_id, m.jid]))
 
