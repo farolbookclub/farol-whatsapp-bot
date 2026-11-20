@@ -408,7 +408,6 @@ async function connectToWhatsApp() {
           const jaInscrita = await inscricaoDoJid(participantJid)
           if (jaInscrita) {
             if (topico === 'bate_papo') await avisarBoasVindasGrupo(sock, update.id, participantJid, jaInscrita.apelido || jaInscrita.nome, jaInscrita.signup_id)
-            await avisarAdminEntrouSaiu('entrou', { apelido: jaInscrita.apelido || jaInscrita.nome, formato: jaInscrita.formato })
             await checarEnviarCodigoSeCompleta(sock, participantJid, jaInscrita.signup_id, jaInscrita.formato)
             continue
           }
@@ -421,7 +420,6 @@ async function connectToWhatsApp() {
             } catch (erro) {
               console.error('guia pós-vínculo automático:', erro)
             }
-            await avisarAdminEntrouSaiu('entrou', { apelido: nome, formato: encontrada.formato })
             await checarEnviarCodigoSeCompleta(sock, participantJid, encontrada.id, encontrada.formato)
           }
         }

@@ -2,11 +2,24 @@ import { supabase } from './supabase.js'
 import { gruposParaEnviar, grupoTemMembro, gruposFaltandoTexto } from './guia.js'
 import { enviarMsg } from './envio.js'
 import { avisarInstagramEntrou } from './instagramAviso.js'
+import { avisarAdminEntrouSaiu } from './pushAdmin.js'
+import { nomeExibicaoDoSignup } from './vinculo.js'
 
 async function avisarInstagramSeTiver(sock, signupId) {
   const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
   if (!s) return
   await avisarInstagramEntrou(sock, signupId, s.apelido || s.nome, s.instagram)
+}
+
+// Avisa a admin que "entrou oficialmente" só aqui (quando termina de entrar
+// em todos os grupos exigidos, 1x só — guardado pelo mesmo codigo_enviado
+// que o resto dessa função). Antes isso disparava em group-participants.update
+// a cada "add" num grupo, inclusive re-sincronizações falsas do WhatsApp pra
+// quem já estava vinculada — gerando avisos repetidos e enganosos.
+async function avisarAdminEntrouOficial(signupId, formato) {
+  const { data: s } = await supabase.from('signups').select('apelido, nome').eq('id', signupId).maybeSingle()
+  const nome = await nomeExibicaoDoSignup(signupId, s?.apelido || s?.nome || 'Alguém')
+  await avisarAdminEntrouSaiu('entrou', { apelido: nome, formato })
 }
 
 // Manda o código sempre em 2 mensagens: uma com o contexto/link, outra só
@@ -75,6 +88,7 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
     await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, '🔑 Código do site de membras:')
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
     await avisarInstagramSeTiver(sock, signupId)
+    await avisarAdminEntrouOficial(signupId, formato)
   } catch (erro) {
     console.error(`enviar código ${jid}:`, erro)
   }
@@ -139,6 +153,7 @@ export async function revisarMembrosIncompletos(sock) {
         await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, '🔑 Código do site de membras:')
         await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', m.jid)
         await avisarInstagramSeTiver(sock, m.signup_id)
+        await avisarAdminEntrouOficial(m.signup_id, formato)
         continue
       }
 
