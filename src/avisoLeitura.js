@@ -125,7 +125,7 @@ export function iniciarEscutaLeitura(getSock) {
 
   function parar(motivo) {
     console.error(`Realtime (leitura) desistiu depois de ${tentativa} tentativas — ${motivo}. Precisa reiniciar o bot.`)
-    avisarAdminErro(`Realtime de leitura parou de tentar reconectar (${tentativa}x) — reinicie o bot.`)
+    avisarAdminErro(`As leituras pararam de sincronizar depois de ${tentativa} tentativas de reconexão. Reinicie o bot.`)
   }
 
   // Só deixa 1 tentativa agendada por vez — se o status de erro disparar

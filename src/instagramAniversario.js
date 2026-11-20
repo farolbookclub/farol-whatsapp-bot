@@ -38,11 +38,15 @@ async function jidAdmin() {
 // Foto + @ do Instagram juntos, numa mensagem só (legenda = o @), pra admin
 // postar manualmente. Só manda se tiver os dois (foto e instagram) — sem
 // instagram não tem nada pra ela postar, então nem vale a pena mandar.
-async function enviarFotoPV(sock, foto, instagram) {
+async function enviarFotoPV(sock, foto, instagram, tipo, nome, tempoTexto) {
   if (!foto || !instagram) return
   try {
     const admin = await jidAdmin()
     if (!admin) return
+    const contexto = tipo === 'clube'
+      ? `⭐ Arte de ${tempoTexto ? tempoTexto.replace(/!$/, '') : 'tempo de clube'} de *${nome}* pronta para postar.`
+      : `🎂 Arte de aniversário de *${nome}* pronta para postar.`
+    await enviarMsg(sock, admin, { text: contexto })
     await enviarMsg(sock, admin, { image: foto, caption: instagram })
   } catch (erro) {
     console.error('enviar foto aniversário (admin):', erro)
@@ -70,7 +74,7 @@ export async function enviarAniversario(sock, { tipo, tempoTexto, pessoas, texto
     } catch (erro) {
       console.error('parabéns (grupo):', erro)
     }
-    await enviarFotoPV(sock, foto, p.instagram)
+    await enviarFotoPV(sock, foto, p.instagram, tipo, p.nome, tempoTexto)
     return
   }
 
@@ -81,6 +85,6 @@ export async function enviarAniversario(sock, { tipo, tempoTexto, pessoas, texto
   }
   for (const p of pessoas) {
     const foto = await gerarImagem(p.signupId, tipo, tempoTexto)
-    await enviarFotoPV(sock, foto, p.instagram)
+    await enviarFotoPV(sock, foto, p.instagram, tipo, p.nome, tempoTexto)
   }
 }

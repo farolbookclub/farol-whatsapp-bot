@@ -176,7 +176,7 @@ export async function desvincularECancelar(sock, jid, signupId, motivo) {
     .update({ status: 'cancelado', cancelado_motivo: motivo, cancelado_em: new Date().toISOString() })
     .eq('id', signupId)
     .neq('status', 'cancelado')
-  await avisarInstagramSaiu(sock, signupId)
+  await avisarInstagramSaiu(sock, signupId, motivo)
 }
 
 // A inscrição aprovada ligada a esse jid (ou null). "apelido" já vem

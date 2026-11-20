@@ -134,12 +134,12 @@ async function processarAudioPendente(client, grupo, transcriberId, row) {
       await atualizarTranscricao(row.id, { status: 'concluido', transcricao, concluido_em: new Date().toISOString() })
     } else {
       await atualizarTranscricao(row.id, { status: 'erro', erro: 'o bot de transcrição não respondeu a tempo', concluido_em: new Date().toISOString() })
-      await avisarAdminErro('Uma transcrição de áudio falhou: o bot de transcrição não respondeu a tempo.')
+      await avisarAdminErro('Um áudio não foi transcrito: o serviço de transcrição não respondeu a tempo.')
     }
   } catch (erro) {
     console.error('processarAudioPendente:', erro)
     await atualizarTranscricao(row.id, { status: 'erro', erro: erro?.message || 'falha desconhecida', concluido_em: new Date().toISOString() })
-    await avisarAdminErro(`Uma transcrição de áudio falhou: ${erro?.message || 'falha desconhecida'}.`)
+    await avisarAdminErro(`Um áudio não foi transcrito: ${erro?.message || 'falha desconhecida'}.`)
   }
 }
 
@@ -237,7 +237,7 @@ export async function iniciarOuvinteTelegram() {
 
     function parar(motivo) {
       console.error(`[Telegram] Realtime (pedidos de transcrição) desistiu depois de ${tentativaPedidos} tentativas — ${motivo}. Precisa reiniciar o bot.`)
-      avisarAdminErro(`Realtime de pedidos de transcrição parou de tentar reconectar (${tentativaPedidos}x) — reinicie o bot.`)
+      avisarAdminErro(`Os pedidos de transcrição pararam de sincronizar depois de ${tentativaPedidos} tentativas de reconexão. Reinicie o bot.`)
     }
 
     // Ver o comentário equivalente em avisoLeitura.js: o socket do Realtime

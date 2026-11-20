@@ -37,3 +37,9 @@ export async function avisarAdminErro(mensagem) {
   ultimoAvisoErroEm = agora
   await chamarNotifyAdminPush({ tipo: 'erro', mensagem: String(mensagem || 'erro sem detalhe').slice(0, 200) })
 }
+
+// Igual avisarAdminErro, mas pro caso do bot cair de vez (uncaughtException):
+// título próprio, pra não parecer um erro comum que se resolve sozinho.
+export async function avisarAdminForaDoAr(mensagem) {
+  await chamarNotifyAdminPush({ tipo: 'fora_do_ar', mensagem: String(mensagem || 'erro sem detalhe').slice(0, 200) })
+}

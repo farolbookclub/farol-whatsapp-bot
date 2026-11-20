@@ -19,7 +19,7 @@ import { processarRemocoesPendentes } from './remocao.js'
 import { processarAutolinkPendentes } from './autolink.js'
 import { checarCodigoPendente, checarEnviarCodigoSeCompleta, responderPedidoCodigo, revisarMembrosIncompletos } from './codigo.js'
 import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorCodigo } from './inatividade.js'
-import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual } from './pushAdmin.js'
+import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual, avisarAdminForaDoAr } from './pushAdmin.js'
 import { confirmarInstagramPendente } from './instagramAviso.js'
 
 const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖'
@@ -392,7 +392,7 @@ async function connectToWhatsApp() {
       await processarPedidoEntrada(sock, req.id, req.participant)
     } catch (erro) {
       console.error('pedido de entrada:', erro)
-      await avisarAdminErro(`pedido de entrada: ${erro?.message || erro}`)
+      await avisarAdminErro(`Erro ao processar um pedido de entrada: ${erro?.message || erro}`)
     }
   })
 
@@ -475,7 +475,7 @@ async function connectToWhatsApp() {
       }
     } catch (erro) {
       console.error('group-participants.update:', erro)
-      await avisarAdminErro(`group-participants.update: ${erro?.message || erro}`)
+      await avisarAdminErro(`Erro ao atualizar os participantes do grupo: ${erro?.message || erro}`)
     }
   })
 
@@ -508,7 +508,7 @@ async function connectToWhatsApp() {
         else if (!jid.endsWith('@broadcast')) await handleDM(sock, m, jid)
       } catch (erro) {
         console.error('processar mensagem:', erro)
-        await avisarAdminErro(`processar mensagem: ${erro?.message || erro}`)
+        await avisarAdminErro(`Erro ao processar uma mensagem: ${erro?.message || erro}`)
       }
     }
   })
@@ -520,11 +520,11 @@ async function connectToWhatsApp() {
 // o Node derrubar o bot, pra ela saber que precisa reiniciar.
 process.on('uncaughtException', (erro) => {
   console.error('uncaughtException:', erro)
-  avisarAdminErro(`o Faroleiro travou: ${erro?.message || erro}`).finally(() => process.exit(1))
+  avisarAdminForaDoAr(erro?.message || erro).finally(() => process.exit(1))
 })
 process.on('unhandledRejection', (erro) => {
   console.error('unhandledRejection:', erro)
-  avisarAdminErro(`erro não tratado: ${erro?.message || erro}`)
+  avisarAdminErro(`Erro inesperado: ${erro?.message || erro}`)
 })
 
 connectToWhatsApp()

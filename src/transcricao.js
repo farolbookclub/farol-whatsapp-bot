@@ -99,7 +99,7 @@ export function iniciarEscutaTranscricoes(getSock) {
 
   function parar(motivo) {
     console.error(`Realtime (transcrições) desistiu depois de ${tentativa} tentativas — ${motivo}. Precisa reiniciar o bot.`)
-    avisarAdminErro(`Realtime de transcrições parou de tentar reconectar (${tentativa}x) — reinicie o bot.`)
+    avisarAdminErro(`As transcrições pararam de sincronizar depois de ${tentativa} tentativas de reconexão. Reinicie o bot.`)
   }
 
   function agendarTentativa() {

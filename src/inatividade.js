@@ -149,7 +149,7 @@ async function aniversarios(sock, hoje) {
     try {
       await enviarAniversario(sock, {
         tipo: 'pessoal',
-        pessoas: aniversariantes.map((m) => ({ signupId: m.signup_id, instagram: m.signups.instagram })),
+        pessoas: aniversariantes.map((m) => ({ signupId: m.signup_id, instagram: m.signups.instagram, nome: nomeDe(m.signup_id, m.signups.apelido || m.signups.nome) })),
         texto,
         mentions: aniversariantes.map((m) => m.jid),
         grupoJid,
@@ -261,7 +261,7 @@ async function aniversariosClube(sock, hoje) {
       await enviarAniversario(sock, {
         tipo: 'clube',
         tempoTexto: `${marco} de Farol!`,
-        pessoas: grupo.map((m) => ({ signupId: m.signup_id, instagram: m.signups?.instagram })),
+        pessoas: grupo.map((m) => ({ signupId: m.signup_id, instagram: m.signups?.instagram, nome: nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome) })),
         texto,
         mentions: grupo.map((m) => m.jid),
         grupoJid,
@@ -322,7 +322,7 @@ async function remover(sock, jid, signupId, grupos, limite, hoje) {
       .eq('id', signupId)
       .neq('status', 'cancelado')
     if (erroSignup) return `erro ao cancelar inscrição: ${erroSignup.message}`
-    await avisarInstagramSaiu(sock, signupId)
+    await avisarInstagramSaiu(sock, signupId, 'inatividade')
   }
 
   for (const g of grupos) {
@@ -359,8 +359,8 @@ function gerarCodigo() {
 }
 
 function textoAprovacao(nome, dias, codigo) {
-  return `⚠️ *Remoção por inatividade*\n\n*${nome}* está há ${dias} dias sem interagir e já recebeu o lembrete. Pelas regras, seria removida agora.\n\n` +
-    `Responda aqui:\n• *!aprovar ${codigo}*: remove agora\n• *!adiar ${codigo} <dias>*: adia (ex: !adiar ${codigo} 7)`
+  return `⚠️ *Remoção por inatividade*\n\n*${nome}* está há ${dias} dias sem interagir e já recebeu o lembrete. Pelas regras do clube, ela deve ser removida agora.\n\n` +
+    `Responda com um destes comandos:\n• *!aprovar ${codigo}* para remover agora\n• *!adiar ${codigo} <dias>* para adiar (ex.: !adiar ${codigo} 7)`
 }
 
 // Pede aprovação da admin em vez de remover direto. Só manda de novo depois
@@ -540,7 +540,7 @@ export async function processarInatividadeDiaria(sock) {
       }
       if (m.remocao_pedida_em === hoje) continue // já pedida hoje, esperando resposta
       if (!config.admin_jid_whatsapp) {
-        await avisarAdminErro('remoção por inatividade pendente, mas admin_jid_whatsapp não está configurado (bot_config)')
+        await avisarAdminErro('Uma remoção por inatividade aguarda sua aprovação, mas o seu WhatsApp não está configurado. Preencha admin_jid_whatsapp em bot_config.')
         logs.push({ ...base, resultado: 'erro: admin_jid_whatsapp não configurado' })
         continue
       }

@@ -19,7 +19,7 @@ export async function avisarInstagramEntrou(sock, signupId, apelido, instagram) 
   if (!jid) return
   const nome = await nomeExibicaoDoSignup(signupId, apelido)
   try {
-    await enviarMsg(sock, jid, { text: `📸 ${nome} entrou oficialmente no clube — já pode adicionar no grupo do Instagram. Segue o perfil dela:` })
+    await enviarMsg(sock, jid, { text: `📸 *${nome}* agora é membra oficial do Farol. Adicione ela no grupo do Instagram. Perfil:` })
     await enviarMsg(sock, jid, { text: instagram })
     await supabase.from('signups').update({ instagram_status: 'pendente', instagram_aviso_em: new Date().toISOString() }).eq('id', signupId)
   } catch (erro) {
@@ -31,15 +31,17 @@ export async function avisarInstagramEntrou(sock, signupId, apelido, instagram) 
 // lembrar de tirar do grupo do Instagram (se tiver colocado — ela adiciona
 // direto por fora, sem confirmar pelo WhatsApp, então não dá pra confiar
 // num status "adicionada"; manda sempre que tiver Instagram cadastrado).
-export async function avisarInstagramSaiu(sock, signupId) {
+export async function avisarInstagramSaiu(sock, signupId, motivo) {
   if (!signupId) return
   const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
   if (!s?.instagram) return
   const jid = await adminJid()
   const nome = await nomeExibicaoDoSignup(signupId, s.apelido || s.nome)
+  const foiPorVontadePropria = motivo === 'saida_voluntaria_grupo' || motivo === 'saida_voluntaria'
+  const acao = foiPorVontadePropria ? 'saiu do Farol' : 'foi removida do Farol'
   if (jid) {
     try {
-      await enviarMsg(sock, jid, { text: `📸 ${nome} (${s.instagram}) saiu/foi removida do clube — se ainda estiver no grupo do Instagram, tira de lá.` })
+      await enviarMsg(sock, jid, { text: `📸 *${nome}* (${s.instagram}) ${acao}. Se ela ainda estiver no grupo do Instagram, remova por lá.` })
     } catch (erro) {
       console.error('avisar instagram (saiu):', erro)
     }
