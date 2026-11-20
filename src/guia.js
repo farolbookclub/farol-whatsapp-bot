@@ -223,8 +223,8 @@ export async function checarPrazoInicio() {
 // jaNosGrupos: true pra quem já foi adicionada direto nos grupos pela
 // Administração (não precisa do link no final, só do guia mesmo).
 export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
-  const texto = `Oi${apelido ? ', *' + apelido + '*' : ''}! Eu sou o *Faroleiro*, o robô do *Farol* 💖\n` +
-    'Vou te mostrar como tudo funciona por aqui. Leva só um minutinho.\n\n' +
+  const texto = `🤖 Oi${apelido ? ', *' + apelido + '*' : ''}! Eu sou o *Faroleiro*, o robô do *Farol* 💖 Mensagens e ações desse número são automáticas. Mesmo assim, leia sempre com atenção, pois recados importantes da administração também chegam por mim. Para falar com uma pessoa, chame a administração no Bate-papo.\n\n` +
+    'Vou te mostrar como tudo funciona por aqui. Leva só um minutinho.\n' +
     'Responda *Ok* para começar.'
   await enviarMsg(sock, jid, { text: texto })
 }

@@ -22,7 +22,7 @@ import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorC
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual, avisarAdminForaDoAr } from './pushAdmin.js'
 import { confirmarInstagramPendente } from './instagramAviso.js'
 
-const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖\nEx.: /duvida quando é o próximo encontro?'
+const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖\nEx.: /duvida quando é o próximo encontro?\n🤖 Sou um assistente automático. Para falar com uma humana, chame a administração no Bate-papo.'
 const NOME_TOPICO = { avisos: 'Avisos', bate_papo: 'Bate-papo', leitura: 'Leitura do mês' }
 
 // Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
@@ -283,7 +283,7 @@ async function handleDM(sock, m, jid) {
   }
 
   if (/^\/ajuda$/i.test(texto)) {
-    await enviarMsg(sock, jid, { text: `*Comandos*\n${AJUDA_COMANDOS}` })
+    await enviarMsg(sock, jid, { text: `*Comandos*\n\n${AJUDA_COMANDOS}` })
     return
   }
 
