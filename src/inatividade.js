@@ -4,6 +4,8 @@ import { enviarMsg } from './envio.js'
 import { avisarInstagramSaiu } from './instagramAviso.js'
 import { enviarAniversario } from './instagramAniversario.js'
 
+const SITE_URL = 'https://biofarol.vercel.app'
+
 // Verificação diária de inatividade (mesma regra do Telegram, Termo v1.1,
 // Cláusulas 6.1 e 7), mais parabéns de aniversário (pessoal e tempo de
 // clube) no grupo Bate-papo do WhatsApp.
@@ -40,13 +42,16 @@ function maisRecente(...datas) {
   return datas.filter(Boolean).sort().at(-1)
 }
 
-function textoLembrete(dias, faltam) {
-  return `Sentimos sua falta! 💕\n` +
-    `Faz ${dias} dias que você não interage no Farol. Com mais ${faltam} dia(s) sem interagir, você sai dos grupos.`
+function textoLembrete(nome, dias, dataLimite) {
+  return `Oi, ${nome}! Sentimos sua falta 💕\n` +
+    `Faz ${dias} dias que você não interage no Farol. Pelas regras, quem passa 15 dias sem interagir sai do clube.\n\n` +
+    `Para continuar com a gente, é só mandar ou reagir a uma mensagem em qualquer grupo até ${dataLimite}. Até um "bom dia" já conta!`
 }
 
-function textoRemocao(limite) {
-  return `Como você ficou ${limite} dias sem interagir com o clube, sua participação foi encerrada, conforme as regras do Farol. Agradecemos pela compreensão!`
+function textoRemocao(nome, limite) {
+  return `Oi, ${nome}. Como você ficou ${limite} dias sem interagir, sua participação no Farol foi encerrada, conforme as regras do clube.\n\n` +
+    `Se quiser voltar, é só fazer uma nova adesão pelo site ${SITE_URL}, de acordo com as vagas disponíveis.\n\n` +
+    `Obrigada por ter lido com a gente ❤️`
 }
 
 function escaparMarcacao(texto) {
@@ -144,8 +149,10 @@ async function aniversarios(sock, hoje) {
     const nomeDe = await nomesExibicaoPorSignup(aniversariantes.map((m) => m.signup_id))
     const pessoas = aniversariantes.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups.apelido || m.signups.nome))}* (@${numeroDoJid(m.jid)})`)
     const texto = aniversariantes.length === 1
-      ? `Hoje é aniversário da ${pessoas[0]}! 🎂🎉\nParabéns! Que seu novo ciclo seja cheio de saúde, felicidade e livros incríveis 💕`
-      : `Hoje é aniversário de ${listaDisplay(pessoas)}! 🎂🎉\nParabéns! Que o novo ciclo de vocês seja cheio de saúde, felicidade e livros incríveis 💕`
+      ? `🎂 Hoje é aniversário da ${pessoas[0]}! Parabéns, desejamos um ano cheio de boas histórias 💖`
+      : aniversariantes.length === 2
+        ? `🎂 Hoje é aniversário da ${pessoas[0]} e da ${pessoas[1]}! Parabéns, desejamos um ano cheio de boas histórias 💖`
+        : `🎂 Hoje é aniversário de ${listaDisplay(pessoas)}! Parabéns, desejamos um ano cheio de boas histórias 💖`
     try {
       await enviarAniversario(sock, {
         tipo: 'pessoal',
@@ -245,17 +252,14 @@ async function aniversariosClube(sock, hoje) {
   let postados = 0
   for (const [marco, grupo] of porMarco) {
     const nomeDe = await nomesExibicaoPorSignup(grupo.map((m) => m.signup_id))
-    const ehMeses = marco.includes('mês') || marco.includes('meses')
     const pessoas = grupo.map((m) => `*${escaparMarcacao(nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome))}* (@${numeroDoJid(m.jid)})`)
     const singular = grupo.length === 1
 
     const texto = singular
-      ? `🎉 Hoje, a ${pessoas[0]} completa ${marco} de Farol! 🥳\n` +
-        `Parabéns e obrigada por estar com a gente 💖\n` +
-        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ✨`
-      : `🎉 Hoje, ${listaDisplay(pessoas)} completam ${marco} de Farol! 🥳\n` +
-        `Parabéns e obrigada por estarem com a gente 💖\n` +
-        `Que venham muitos ${ehMeses ? 'meses' : 'anos'} juntinhas ✨`
+      ? `🎀 Hoje a ${pessoas[0]} completa ${marco} de Farol! Obrigada por fazer parte 💖`
+      : grupo.length === 2
+        ? `🎀 Hoje a ${pessoas[0]} e a ${pessoas[1]} completam ${marco} de Farol! Obrigada por fazerem parte 💖`
+        : `🎀 Hoje ${listaDisplay(pessoas)} completam ${marco} de Farol! Obrigada por fazerem parte 💖`
 
     try {
       await enviarAniversario(sock, {
@@ -295,9 +299,9 @@ async function aniversarioFarol(sock, hoje) {
 
   try {
     await enviarMsg(sock, grupoJid, {
-      text: `✨ Hoje o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 🎉📚\n\n` +
+      text: `🎀 Hoje o Farol Book Club completa ${anos} ano${anos === 1 ? '' : 's'}! 📚\n\n` +
         `Desde 15/08/2024, já somos ${count ?? 0} integrantes lendo, trocando ideias e fazendo amizades 💖\n\n` +
-        'Obrigada por fazerem do Farol esse lugar especial! 🫶🏻⚓\n' +
+        'Obrigada por fazerem do Farol esse lugar especial 🫶🏻⚓\n' +
         '*Farol Book Club*',
     })
   } catch (erro) {
@@ -309,7 +313,7 @@ async function aniversarioFarol(sock, hoje) {
 }
 
 // Remoção real por inatividade. Devolve o texto do resultado pro log.
-async function remover(sock, jid, signupId, grupos, limite, hoje) {
+async function remover(sock, jid, signupId, grupos, limite, hoje, nome) {
   // Cancela a inscrição ANTES de remover dos grupos (não depois): assim,
   // quando o group-participants.update disparar pra cada grupo (porque o
   // próprio bot removeu), o handler já vê a inscrição cancelada e não
@@ -340,7 +344,7 @@ async function remover(sock, jid, signupId, grupos, limite, hoje) {
 
   let avisoOk = true
   try {
-    await enviarMsg(sock, jid, { text: textoRemocao(limite) })
+    await enviarMsg(sock, jid, { text: textoRemocao(nome || 'ela', limite) })
   } catch (erro) {
     avisoOk = false
     console.error(`aviso de remoção ${jid}:`, erro)
@@ -391,7 +395,7 @@ export async function confirmarRemocaoPorCodigo(sock, codigo) {
   const { data: grupos } = await supabase.from('whatsapp_grupos').select('group_jid, nome').eq('ativo', true)
   const nomeDe = await nomesExibicaoPorSignup([m.signup_id])
   const nome = nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome || 'ela')
-  const resultado = await remover(sock, m.jid, m.signup_id, grupos ?? [], config?.dias_limite ?? 30, hojeSP())
+  const resultado = await remover(sock, m.jid, m.signup_id, grupos ?? [], config?.dias_limite ?? 30, hojeSP(), nome)
   await supabase.from('whatsapp_inatividade_log').insert({
     jid: m.jid, signup_id: m.signup_id, data_referencia: hojeSP(), modo: 'real', resultado: `aprovada pela admin; ${resultado}`,
   })
@@ -556,7 +560,11 @@ export async function processarInatividadeDiaria(sock) {
       }
       let entregue = true
       try {
-        await enviarMsg(sock, m.jid, { text: textoLembrete(dias, Math.max(config.dias_limite - dias, 1)) })
+        const nome = nomeDe(m.signup_id, m.signups?.apelido || m.signups?.nome || 'ela')
+        const faltam = Math.max(config.dias_limite - dias, 1)
+        const dataLimite = new Date(Date.parse(`${hoje}T00:00:00Z`) + faltam * 86400000)
+          .toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })
+        await enviarMsg(sock, m.jid, { text: textoLembrete(nome, dias, dataLimite) })
       } catch (erro) {
         entregue = false
         console.error(`lembrete ${m.jid}:`, erro)

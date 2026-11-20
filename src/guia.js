@@ -1,7 +1,7 @@
 import fs from 'fs'
 import { supabase } from './supabase.js'
 import { enviarMsg } from './envio.js'
-import { desvincularECancelar } from './vinculo.js'
+import { desvincularECancelar, nomeExibicaoDoSignup } from './vinculo.js'
 
 const SITE_URL = 'https://biofarol.vercel.app'
 const OK = '\n\nResponda _Ok_ para continuar'
@@ -13,24 +13,25 @@ const FOTO_GRUPOS_ONLINE = new URL('../assets/grupos-online.png', import.meta.ur
 const FOTO_SITE_MEMBRAS = new URL('../assets/site-membras.jpg', import.meta.url)
 
 const GUIA_SITE =
-  '✨ *Site das membras:* https://membrosfarol.vercel.app/\n' +
-  '🔑 Você recebe o código aqui, assim que entrar nos grupos (os links vêm logo a seguir).\n' +
-  '📲 Toque no ícone de download (circulado no print) para instalar no celular.\n\n' +
-  'No site você:\n' +
+  '✨ *Site das membras*\n' +
+  'https://membrosfarol.vercel.app/\n\n' +
+  'No site, você:\n' +
   '📖 vê o livro do mês, a leitura extra e os gatilhos\n' +
   '📚 registra seu progresso e dá nota\n' +
-  '🗂️ vê o histórico (⚠️ pode ter spoiler)\n' +
-  '💌 envia sugestões e denúncias no *Clubinho*\n' +
-  '🔎 acha regras, encontrinhos, membras e mais'
+  '🗂️ consulta o histórico de leituras (⚠️ pode ter spoiler)\n' +
+  '💌 envia sugestões e denúncias pelo Clubinho\n' +
+  '🔎 encontra regras, encontrinhos, membras e mais\n\n' +
+  '📲 Para instalar no celular, toque no ícone de download (circulado no print).\n' +
+  '🔑 Para acessar, você vai usar seu código de membra. Ele chega aqui assim que você entrar em todos os grupos, e os links vêm logo a seguir.'
 
 const GUIA_LEITURA =
-  '📚 A leitura do livro do mês já está em andamento. Não temos cronograma: cada uma lê no seu ritmo, até a data do encontro da sua modalidade.\n\n' +
-  'A data e os detalhes estão no site de membras.'
+  '📚 *Leitura do mês*\n' +
+  'A leitura do livro do mês já começou. Não temos cronograma: cada uma lê no seu ritmo até o dia do seu encontro, online ou presencial.\n\n' +
+  'A data e os detalhes estão no site das membras.'
 
 const GUIA_SPOILER =
   '💬 *Spoilers e comentários*\n' +
-  'Ao comentar o livro, escreva *SPOILER* + onde você está (capítulo, pág. ou %) e depois o comentário.\n' +
-  'Foto? Envie em visualização única.'
+  'Ao comentar o livro, comece com SPOILER e diga em que parte você está (ex.: SPOILER cap. 12). Assim ninguém tem surpresas antes da hora 😉'
 
 export async function gruposParaEnviar(formato) {
   const topicos = ['bate_papo', 'leitura', 'avisos']
@@ -78,8 +79,8 @@ export async function grupoTemMembro(sock, groupJid, jid) {
 }
 
 const COMANDOS_PV =
-  'Dúvida? Mande aqui: */duvida* + sua pergunta.\n' +
-  'Se eu não souber, pergunte no Bate-papo marcando a Kah 💖'
+  'Ficou com alguma dúvida? Me mande aqui: */duvida* + sua pergunta.\n' +
+  'Se eu não souber responder, pergunte no Bate-papo que a administração te ajuda 🩷'
 
 // Confere de verdade (via groupMetadata) em quais grupos a pessoa já está —
 // devolve quais grupos faltam (com o link de cada um já pronto), ou
@@ -114,14 +115,14 @@ async function finalizarGuia(sock, jid, formato) {
   if (r.completo) {
     await enviarMsg(sock, jid, {
       text: 'Você já está em todos os grupos. Bem-vinda! 💖\n\n' +
-        'Ainda não se apresentou? Faça isso no *Bate-papo*: nome, cidade, livro favorito, pets e hobbies 📚\n\n' +
+        'Ainda não se apresentou? Conta pra gente no Bate-papo: seu nome, sua cidade, seu livro favorito, se tem pets e quais são seus hobbies 📚\n\n' +
         COMANDOS_PV,
     })
     return
   }
   const faltaTudo = r.faltando.length === r.totalGrupos
-  const intro = faltaTudo ? 'Entre nos grupos (toque no link e peça para entrar):\n\n' : 'Falta entrar em:\n\n'
-  const aviso48h = '\n\n⏳ Esses links ficam disponíveis por 48h. Se você não entrar em todos nesse prazo, entendemos como desinteresse e a vaga é liberada.'
+  const intro = faltaTudo ? 'Entre nos grupos (toque no link e peça para entrar):\n\n' : 'Ainda falta você entrar em:\n\n'
+  const aviso48h = '\n\n⏳ Os links valem por 48 horas. Depois disso, a vaga é liberada para outra leitora.'
   await enviarMsg(sock, jid, { text: `${intro}${r.links}\n${COMANDOS_PV}${aviso48h}` })
 
   // Só marca (e só na 1ª vez) quando os links de fato saíram agora — é o
@@ -144,7 +145,7 @@ export async function checarPrazoLinks(sock) {
   const limite = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
   const { data: membros } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signup_id, signups (formato)')
+    .select('jid, signup_id, signups (apelido, nome, formato)')
     .is('removido_em', null)
     .eq('codigo_enviado', false)
     .not('links_enviados_em', 'is', null)
@@ -172,8 +173,10 @@ export async function checarPrazoLinks(sock) {
         }
       }
       try {
+        const nome = await nomeExibicaoDoSignup(m.signup_id, m.signups?.apelido || m.signups?.nome || '')
         await enviarMsg(sock, m.jid, {
-          text: 'Como você não entrou em todos os grupos dentro de 48h, entendemos como desinteresse e sua vaga foi liberada 💔 Se quiser voltar, é só fazer uma nova inscrição pelo site.',
+          text: `Oi, ${nome}. Como você não entrou em todos os grupos dentro de 48 horas, sua vaga foi liberada para outra leitora 💔\n\n` +
+            `Se quiser tentar de novo, é só fazer uma nova adesão pelo site ${SITE_URL}, de acordo com as vagas disponíveis.`,
         })
       } catch (erro) {
         console.error(`aviso de remoção por prazo ${m.jid}:`, erro)
@@ -220,8 +223,9 @@ export async function checarPrazoInicio() {
 // jaNosGrupos: true pra quem já foi adicionada direto nos grupos pela
 // Administração (não precisa do link no final, só do guia mesmo).
 export async function iniciarGuia(sock, jid, apelido, jaNosGrupos) {
-  const fim = jaNosGrupos ? 'Vou te mandar um guia rapidinho 💕' : 'Antes de entrar, vou te mandar um guia rapidinho 💕'
-  const texto = `Oii${apelido ? ' *' + apelido + '*' : ''}! Eu sou o *Faroleiro*, o robô do *Farol* 💖\n${fim}${OK}`
+  const texto = `Oi${apelido ? ', *' + apelido + '*' : ''}! Eu sou o *Faroleiro*, o robô do *Farol* 💖\n` +
+    'Vou te mostrar como tudo funciona por aqui. Leva só um minutinho.\n\n' +
+    'Responda *Ok* para começar.'
   await enviarMsg(sock, jid, { text: texto })
 }
 
@@ -243,16 +247,16 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   if (etapa === 1) {
     const presencial = formato === 'presencial'
     const texto2 = presencial
-      ? 'Nossos grupos:\n\n' +
-        '📢 *Avisos*: recados da Administração\n' +
-        '💬 *Bate-papo*: conversa livre\n' +
-        '📚 *Leitura do mês*: o livro atual\n' +
-        '☕ *Presencial*: só para quem participa' +
+      ? '*Nossos grupos*\n\n' +
+        '📢 *Avisos*: recados da administração\n' +
+        '💬 *Bate-papo*: conversa livre entre as membras\n' +
+        '📚 *Leitura do mês*: tudo sobre o livro atual\n' +
+        '☕ *Presencial*: só para quem participa dos encontros presenciais' +
         OK
-      : 'Nossos grupos:\n\n' +
-        '📢 *Avisos*: recados da Administração\n' +
-        '💬 *Bate-papo*: conversa livre\n' +
-        '📚 *Leitura do mês*: o livro atual' +
+      : '*Nossos grupos*\n\n' +
+        '📢 *Avisos*: recados da administração\n' +
+        '💬 *Bate-papo*: conversa livre entre as membras\n' +
+        '📚 *Leitura do mês*: tudo sobre o livro atual' +
         OK
     // Manda a foto dos grupos certa pro formato (se o arquivo existir no
     // celular) com esse texto de legenda; senão, cai pro texto puro.

@@ -147,7 +147,7 @@ export function iniciarEscutaTranscricoes(getSock) {
             await enviarMsg(
               sock,
               row.group_jid,
-              { text: `*Transcrição*:\n_"${row.transcricao}"_` },
+              { text: `🎙️ *Transcrição do áudio*\n_${row.transcricao}_` },
               { quoted: { key: { remoteJid: row.group_jid, id: row.msg_id, participant: row.participant || undefined, fromMe: false }, message: { audioMessage: {} } } },
             )
           } catch (erro) {

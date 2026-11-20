@@ -84,8 +84,8 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
   if (!config?.codigo_atual) return
 
   try {
-    await enviarMsg(sock, jid, { text: 'Pronto, você está oficialmente no Farol! 🎉 Bem-vinda 💖' })
-    await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, '🔑 Código do site de membras:')
+    await enviarMsg(sock, jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
+    await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, 'Este é o seu código de membra. Guarde, porque você vai usar no site:')
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
     await avisarInstagramSeTiver(sock, signupId)
     await avisarAdminEntrouOficial(signupId, formato)
@@ -105,7 +105,7 @@ export async function responderPedidoCodigo(sock, jid, signupId, formato) {
     return
   }
   if (!r.completo) {
-    await enviarMsg(sock, jid, { text: `Falta entrar em:\n\n${r.links}\npra você estar oficialmente no clube e receber o código 💖` })
+    await enviarMsg(sock, jid, { text: `Ainda falta você entrar em:\n\n${r.links}\npra você estar oficialmente no clube e receber o código 💖` })
     return
   }
 
@@ -131,7 +131,7 @@ export async function responderPedidoCodigo(sock, jid, signupId, formato) {
 export async function revisarMembrosIncompletos(sock) {
   const { data: membros } = await supabase
     .from('whatsapp_membros')
-    .select('jid, signup_id, grupos_incompletos_desde, lembrete_grupos_enviado_em, signups (formato)')
+    .select('jid, signup_id, grupos_incompletos_desde, lembrete_grupos_enviado_em, links_enviados_em, signups (apelido, nome, formato)')
     .is('removido_em', null)
     .eq('codigo_enviado', false)
     .not('grupos_incompletos_desde', 'is', null)
@@ -149,8 +149,8 @@ export async function revisarMembrosIncompletos(sock) {
       if (r.completo) {
         const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
         if (!config?.codigo_atual) continue
-        await enviarMsg(sock, m.jid, { text: 'Pronto, você está oficialmente no Farol! 🎉 Bem-vinda 💖' })
-        await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, '🔑 Código do site de membras:')
+        await enviarMsg(sock, m.jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
+        await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, 'Este é o seu código de membra. Guarde, porque você vai usar no site:')
         await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', m.jid)
         await avisarInstagramSeTiver(sock, m.signup_id)
         await avisarAdminEntrouOficial(m.signup_id, formato)
@@ -160,8 +160,14 @@ export async function revisarMembrosIncompletos(sock) {
       if (m.lembrete_grupos_enviado_em) continue // já lembrou, não repete
       if (new Date(m.grupos_incompletos_desde).getTime() > umaHoraAtras) continue // ainda não faz 1h
 
+      const nome = await nomeExibicaoDoSignup(m.signup_id, m.signups?.apelido || m.signups?.nome || '')
+      const prazo = m.links_enviados_em
+        ? new Date(new Date(m.links_enviados_em).getTime() + 48 * 60 * 60 * 1000)
+            .toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+        : null
       await enviarMsg(sock, m.jid, {
-        text: `Verifiquei aqui e ainda falta você entrar em:\n\n${r.links}\npra você estar oficialmente no clube 💖`,
+        text: `Oi, ${nome}! Passando para lembrar que ainda falta você entrar em:\n\n${r.links}\n` +
+          (prazo ? `⏳ Os links valem até ${prazo}.` : '⏳ Os links valem por 48 horas.'),
       })
       await supabase.from('whatsapp_membros').update({ lembrete_grupos_enviado_em: new Date().toISOString() }).eq('jid', m.jid)
     } catch (erro) {

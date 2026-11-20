@@ -22,7 +22,8 @@ import { processarInatividadeDiaria, confirmarRemocaoPorCodigo, adiarRemocaoPorC
 import { avisarAdminEntrouSaiu, avisarAdminErro, avisarAdminRevisaoManual, avisarAdminForaDoAr } from './pushAdmin.js'
 import { confirmarInstagramPendente } from './instagramAviso.js'
 
-const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖'
+const AJUDA_COMANDOS = '*/duvida* + sua pergunta: eu tento te ajudar 💖\nEx.: /duvida quando é o próximo encontro?'
+const NOME_TOPICO = { avisos: 'Avisos', bate_papo: 'Bate-papo', leitura: 'Leitura do mês' }
 
 // Referência pra conexão atual (reconecta sozinho, então isso muda com o tempo).
 let sockAtual = null
@@ -40,9 +41,9 @@ function textoDaMensagem(m) {
 async function avisarBoasVindasGrupo(sock, groupJid, participantJid, nome, signupId) {
   try {
     const apresentacao = await apresentacaoDoSignup(signupId)
-    const miolo = apresentacao ? `Apresentação:\n_${apresentacao}_` : 'Fique à vontade para se apresentar! 💖'
+    const miolo = apresentacao ? `Apresentação:\n_${apresentacao}_` : 'Conta pra gente: quem é você e o que anda lendo? 📚'
     await enviarMsg(sock, groupJid, {
-      text: `Bem-vinda, *${nome}* (@${participantJid.split('@')[0].split(':')[0]})! 🎉 Que bom ter você no Farol 🥹\n${miolo}`,
+      text: `Bem-vinda ao Farol, @${participantJid.split('@')[0].split(':')[0]}! 🎀 Que bom ter você com a gente 🥹\n${miolo}`,
       mentions: [participantJid],
     })
   } catch (erro) {
@@ -83,7 +84,9 @@ async function processarPedidoEntrada(sock, groupJid, participantJid) {
     // formato errado (ex: online tentando entrar no grupo Presencial).
     if (inscricao) {
       try {
-        await enviarMsg(sock, participantJid, { text: 'Esse grupo é só para o Farol Presencial.' })
+        await enviarMsg(sock, participantJid, {
+          text: `Oi, ${inscricao.apelido || inscricao.nome}! Esse grupo é só para as membras do Farol Presencial. Como sua inscrição é no online, você segue nos grupos Avisos, Bate-papo e Leitura do mês 🩷`,
+        })
       } catch (erro) {
         console.error('aviso de recusa:', erro)
       }
@@ -280,7 +283,7 @@ async function handleDM(sock, m, jid) {
   }
 
   if (/^\/ajuda$/i.test(texto)) {
-    await enviarMsg(sock, jid, { text: `Comandos:\n${AJUDA_COMANDOS}` })
+    await enviarMsg(sock, jid, { text: `*Comandos*\n${AJUDA_COMANDOS}` })
     return
   }
 
@@ -439,7 +442,7 @@ async function connectToWhatsApp() {
               if (update.action === 'leave') {
                 try {
                   await enviarMsg(sock, participantJid, {
-                    text: 'Vi que você saiu do grupo do Presencial 💔 Entendemos que não quer mais participar dessa modalidade, então sua vaga presencial foi liberada e você passou a participar do Farol online.',
+                    text: 'Vi que você saiu do grupo do Presencial. Por isso, sua vaga nos encontros presenciais foi liberada e você continua no Farol online ❤️',
                   })
                 } catch (erro) {
                   console.error('aviso de saída do presencial (DM):', erro)
@@ -460,8 +463,11 @@ async function connectToWhatsApp() {
               await desvincularECancelar(sock, participantJid, membro?.signup_id || null, motivo)
               if (update.action === 'leave') {
                 try {
+                  const nomeGrupo = NOME_TOPICO[topico]
                   await enviarMsg(sock, participantJid, {
-                    text: 'Vi que você saiu de um dos grupos do Farol 💔 Por isso, você foi removida automaticamente de todos os grupos do clube. Se quiser voltar, faça uma nova adesão no site do Farol. A aprovação depende de vaga disponível.',
+                    text: nomeGrupo
+                      ? `Vi que você saiu do grupo ${nomeGrupo}. Como ele é obrigatório para as membras, sua participação no Farol foi encerrada automaticamente.`
+                      : 'Vi que você saiu de um dos grupos do Farol. Por isso, sua participação no Farol foi encerrada automaticamente.',
                   })
                 } catch (erro) {
                   console.error('aviso de saída (DM):', erro)

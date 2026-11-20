@@ -40,9 +40,16 @@ async function textoProgresso(p, livro) {
   const quem = await resolverMencao(p.nome)
   const abandono = p.tipo === 'abandono'
   const pct = porcentagem(p)
-  const verbo = abandono ? 'abandonou' : pct !== null && pct >= 100 ? 'terminou' : 'atualizou'
+  const terminou = !abandono && pct !== null && pct >= 100
 
-  let texto = `${quem.texto} ${verbo} *"${livro}"*\n\n`
+  let texto
+  if (abandono) {
+    texto = `${quem.texto} deixou *"${livro}"* de lado por enquanto.\n\n`
+  } else if (terminou) {
+    texto = `🏁 ${quem.texto} terminou *"${livro}"*!\n\n`
+  } else {
+    texto = `📖 ${quem.texto} atualizou a leitura de *"${livro}"*\n\n`
+  }
   texto += `* *${abandono ? 'Parou em' : 'Progresso'}:* ${trechoProgresso(p)}\n`
   if (p.emocoes?.length) texto += `* *Emoções:* ${p.emocoes.join(', ')}\n`
   if (p.comentario) texto += `* *Comentário:* veja no site (pode ter spoiler): ${SITE_MEMBRAS}\n`
@@ -56,8 +63,8 @@ async function textoProgresso(p, livro) {
 async function textoNota(r, livro) {
   const quem = await resolverMencao(r.nome_publico)
   const nota = String(Number(r.rating)).replace('.', ',')
-  let texto = `⭐ ${quem.texto} avaliou "${livro}": nota ${nota}`
-  if (r.is_favorite) texto += ' + favoritado ❤️'
+  let texto = `⭐ ${quem.texto} deu nota ${nota} para "${livro}"`
+  if (r.is_favorite) texto += ' e favoritou ❤️'
   return { texto, mention: quem.mention }
 }
 

@@ -1,35 +1,41 @@
 import { supabase } from './supabase.js'
 import { avisarInstagramSaiu } from './instagramAviso.js'
 
+const SITE_URL = 'https://biofarol.vercel.app'
+
 // Texto pra cada motivo de cancelamento possível (cancelado_motivo +, pra
 // quebra_regra, o começo de cancelado_detalhe — que guarda o rótulo da
 // regra escolhida no painel: "Ausência virtual", "3 encontros sem ir" etc.).
 // outro_motivo, removida_adm_whatsapp e sem motivo registrado caem todos no
-// genérico (fallback), de propósito.
-function textoMotivoCancelamento(motivo, detalhe) {
+// genérico (fallback), de propósito. Só os motivos "voltáveis" (inatividade
+// e não completou os grupos em 48h) têm a linha de nova adesão — os outros
+// ficam sem, de propósito.
+function textoMotivoCancelamento(nome, motivo, detalhe) {
   const d = detalhe || ''
   if (motivo === 'inatividade' || d.startsWith('Ausência virtual')) {
-    return 'Sua inscrição foi cancelada por inatividade: foram 15 dias sem interagir no clube.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada porque você passou 15 dias sem interagir no clube.\n\n` +
+      `Para voltar, faça uma nova adesão pelo site ${SITE_URL}, de acordo com as vagas disponíveis 🩷`
   }
   if (d.startsWith('3 encontros sem ir')) {
-    return 'Sua inscrição foi cancelada porque você faltou a 3 encontros presenciais seguidos.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada porque você faltou a 3 encontros presenciais seguidos.`
   }
   if (motivo === 'quebra_regra') {
-    return 'Sua inscrição foi cancelada porque uma das regras do clube não foi cumprida.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada porque uma das regras do clube não foi cumprida. Se tiver dúvidas, fale com a administração.`
   }
   if (motivo === 'prazo_48h_nao_completou') {
-    return 'Sua inscrição foi cancelada porque você não entrou em todos os grupos dentro das 48h.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada porque você não entrou em todos os grupos dentro de 48 horas.\n\n` +
+      `Para tentar de novo, faça uma nova adesão pelo site ${SITE_URL}, de acordo com as vagas disponíveis 🩷`
   }
   if (motivo === 'prazo_48h_nao_iniciou') {
-    return 'Sua inscrição foi cancelada porque você não iniciou a conversa com o Faroleiro dentro das 48h após a aprovação.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada porque você não falou comigo dentro de 48 horas depois da aprovação.`
   }
   if (motivo === 'saida_voluntaria_grupo') {
-    return 'Sua inscrição foi cancelada porque você saiu de um ou mais grupos do clube.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada porque você saiu de um ou mais grupos do clube.`
   }
   if (motivo === 'saida_voluntaria') {
-    return 'Sua inscrição foi cancelada a pedido, por saída voluntária.'
+    return `Oi, ${nome}. Sua inscrição foi cancelada, como você pediu.`
   }
-  return 'Sua inscrição foi cancelada.'
+  return `Oi, ${nome}. Sua inscrição no Farol foi cancelada. Se tiver dúvidas, fale com a administração.`
 }
 
 // Quem aparece de verdade é sempre o "Nome ou apelido de exibição"
@@ -82,7 +88,7 @@ export async function vincularContaPorCodigo(jid, codigo) {
     return {
       ok: false,
       texto: cadastro.status === 'cancelado'
-        ? `${textoMotivoCancelamento(cadastro.cancelado_motivo, cadastro.cancelado_detalhe)} Para voltar, faça uma nova adesão no site do Farol. A aprovação depende de vaga disponível.`
+        ? textoMotivoCancelamento(cadastro.apelido || cadastro.nome || 'oi', cadastro.cancelado_motivo, cadastro.cancelado_detalhe)
         : 'Sua inscrição ainda não foi liberada. Confirme seu e-mail e toque no botão de novo.',
     }
   }
