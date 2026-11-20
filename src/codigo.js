@@ -1,33 +1,8 @@
 import { supabase } from './supabase.js'
 import { gruposParaEnviar, grupoTemMembro, gruposFaltandoTexto } from './guia.js'
 import { enviarMsg } from './envio.js'
-import { avisarInstagramEntrou } from './instagramAviso.js'
-import { avisarAdminEntrouSaiu } from './pushAdmin.js'
 import { nomeExibicaoDoSignup } from './vinculo.js'
-
-async function avisarInstagramSeTiver(sock, signupId) {
-  const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
-  if (!s) return
-  await avisarInstagramEntrou(sock, signupId, s.apelido || s.nome, s.instagram)
-}
-
-// Avisa a admin que "entrou oficialmente" só aqui (quando termina de entrar
-// em todos os grupos exigidos, 1x só — guardado pelo mesmo codigo_enviado
-// que o resto dessa função). Antes isso disparava em group-participants.update
-// a cada "add" num grupo, inclusive re-sincronizações falsas do WhatsApp pra
-// quem já estava vinculada — gerando avisos repetidos e enganosos.
-async function avisarAdminEntrouOficial(signupId, formato) {
-  const { data: s } = await supabase.from('signups').select('apelido, nome').eq('id', signupId).maybeSingle()
-  const nome = await nomeExibicaoDoSignup(signupId, s?.apelido || s?.nome || 'Alguém')
-  await avisarAdminEntrouSaiu('entrou', { apelido: nome, formato })
-}
-
-// Manda o código sempre em 2 mensagens: uma com o contexto/link, outra só
-// com o código em si (sem mais nada), pra facilitar copiar e colar.
-async function enviarCodigoEmDuasMensagens(sock, jid, codigo, textoIntro) {
-  await enviarMsg(sock, jid, { text: `${textoIntro}\nhttps://membrosfarol.vercel.app/` })
-  await enviarMsg(sock, jid, { text: `*${codigo}*` })
-}
+import { enviarCodigoEmDuasMensagens, concluirEntradaOficial } from './finalizacaoMembra.js'
 
 // Confere se o código do site mudou (rotação automática semanal ou pedido
 // manual) e ainda não foi postado no Avisos do WhatsApp; posta se precisar.
@@ -80,18 +55,7 @@ export async function checarEnviarCodigoSeCompleta(sock, jid, signupId, formato)
     }
   }
 
-  const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
-  if (!config?.codigo_atual) return
-
-  try {
-    await enviarMsg(sock, jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
-    await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, 'Este é o seu código de membra. Guarde, porque você vai usar no site:')
-    await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
-    await avisarInstagramSeTiver(sock, signupId)
-    await avisarAdminEntrouOficial(signupId, formato)
-  } catch (erro) {
-    console.error(`enviar código ${jid}:`, erro)
-  }
+  await concluirEntradaOficial(sock, jid, signupId, formato)
 }
 
 // Alguém já integrante pede o código de novo (ex.: "não achei o código").
@@ -147,13 +111,7 @@ export async function revisarMembrosIncompletos(sock) {
       if (!r.configurado) continue
 
       if (r.completo) {
-        const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
-        if (!config?.codigo_atual) continue
-        await enviarMsg(sock, m.jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
-        await enviarCodigoEmDuasMensagens(sock, m.jid, config.codigo_atual, 'Este é o seu código de membra. Guarde, porque você vai usar no site:')
-        await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', m.jid)
-        await avisarInstagramSeTiver(sock, m.signup_id)
-        await avisarAdminEntrouOficial(m.signup_id, formato)
+        await concluirEntradaOficial(sock, m.jid, m.signup_id, formato)
         continue
       }
 

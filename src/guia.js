@@ -2,6 +2,7 @@ import fs from 'fs'
 import { supabase } from './supabase.js'
 import { enviarMsg } from './envio.js'
 import { desvincularECancelar, nomeExibicaoDoSignup } from './vinculo.js'
+import { concluirEntradaOficial } from './finalizacaoMembra.js'
 
 const SITE_URL = 'https://biofarol.vercel.app'
 const OK = '\n\nResponda _Ok_ para continuar'
@@ -106,7 +107,7 @@ export async function gruposFaltandoTexto(sock, jid, formato) {
 }
 
 // Última etapa do guia.
-async function finalizarGuia(sock, jid, formato) {
+async function finalizarGuia(sock, jid, formato, signupId) {
   const r = await gruposFaltandoTexto(sock, jid, formato)
   if (!r.configurado) {
     await enviarMsg(sock, jid, { text: 'Os grupos ainda não estão configurados. Chame a Administração 💖' })
@@ -118,6 +119,10 @@ async function finalizarGuia(sock, jid, formato) {
         'Ainda não se apresentou? Conta pra gente no Bate-papo: seu nome, sua cidade, seu livro favorito, se tem pets e quais são seus hobbies 📚\n\n' +
         COMANDOS_PV,
     })
+    // Já estava em todos os grupos quando terminou o guia (não precisou
+    // esperar nenhum evento de entrada chegar depois) — manda o código
+    // oficial agora mesmo, sem duplicar se já tiver saído por outro caminho.
+    await concluirEntradaOficial(sock, jid, signupId, formato)
     return
   }
   const faltaTudo = r.faltando.length === r.totalGrupos
@@ -293,7 +298,7 @@ export async function tentarAvancarGuia(sock, jid, texto) {
   }
 
   if (etapa === 5) {
-    await finalizarGuia(sock, jid, formato)
+    await finalizarGuia(sock, jid, formato, membro.signup_id)
     await supabase.from('whatsapp_membros').update({ guia_etapa: null }).eq('jid', jid)
     return true
   }
