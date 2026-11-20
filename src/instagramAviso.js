@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { enviarMsg } from './envio.js'
+import { nomeExibicaoDoSignup } from './vinculo.js'
 
 async function adminJid() {
   const { data } = await supabase.from('bot_config').select('admin_jid_whatsapp').eq('id', 1).maybeSingle()
@@ -16,8 +17,9 @@ export async function avisarInstagramEntrou(sock, signupId, apelido, instagram) 
   if (!instagram) return
   const jid = await adminJid()
   if (!jid) return
+  const nome = await nomeExibicaoDoSignup(signupId, apelido)
   try {
-    await enviarMsg(sock, jid, { text: `📸 ${apelido} entrou oficialmente no clube — já pode adicionar no grupo do Instagram. Segue o perfil dela:` })
+    await enviarMsg(sock, jid, { text: `📸 ${nome} entrou oficialmente no clube — já pode adicionar no grupo do Instagram. Segue o perfil dela:` })
     await enviarMsg(sock, jid, { text: instagram })
     await supabase.from('signups').update({ instagram_status: 'pendente', instagram_aviso_em: new Date().toISOString() }).eq('id', signupId)
   } catch (erro) {
@@ -34,9 +36,10 @@ export async function avisarInstagramSaiu(sock, signupId) {
   const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
   if (!s?.instagram) return
   const jid = await adminJid()
+  const nome = await nomeExibicaoDoSignup(signupId, s.apelido || s.nome)
   if (jid) {
     try {
-      await enviarMsg(sock, jid, { text: `📸 ${s.apelido || s.nome} (${s.instagram}) saiu/foi removida do clube — se ainda estiver no grupo do Instagram, tira de lá.` })
+      await enviarMsg(sock, jid, { text: `📸 ${nome} (${s.instagram}) saiu/foi removida do clube — se ainda estiver no grupo do Instagram, tira de lá.` })
     } catch (erro) {
       console.error('avisar instagram (saiu):', erro)
     }
