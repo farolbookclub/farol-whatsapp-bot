@@ -514,7 +514,8 @@ export async function processarInatividadeDiaria(sock) {
   const logs = []
   for (const m of membros ?? []) {
     const numero = numeroDoJid(m.jid)
-    const referencia = maisRecente(m.ultima_interacao, m.entrou_em, config.lancamento_em, config.pausa_inatividade_reinicio)
+    const reinicioJaChegou = config.pausa_inatividade_reinicio && hoje >= config.pausa_inatividade_reinicio
+    const referencia = maisRecente(m.ultima_interacao, m.entrou_em, config.lancamento_em, reinicioJaChegou ? config.pausa_inatividade_reinicio : null)
     const dias = diasEntre(referencia, hoje)
     const base = { jid: m.jid, signup_id: m.signup_id, ultima_interacao: m.ultima_interacao, data_referencia: referencia, modo }
 
