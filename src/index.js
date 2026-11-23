@@ -289,8 +289,11 @@ async function handleDM(sock, m, jid) {
 
   // Pedido de resumo (função removida), de qualquer jeito que venha — comando
   // antigo ou pedido em texto livre tipo "me resume o livro"/"resuma o
-  // grupo": ignora, não manda pra IA.
-  if (/resum[iao]/i.test(texto)) return
+  // grupo": avisa que está desabilitado, não manda pra IA.
+  if (/resum[iao]/i.test(texto)) {
+    await enviarMsg(sock, jid, { text: '⚙️ Por questões técnicas, a função de resumir conversas foi desabilitada. Agradecemos a compreensão! 💗' })
+    return
+  }
 
   const comandoDuvida = texto.match(/^\/?d[uú]vida[\s:,-]+([\s\S]+)/i)
   if (comandoDuvida) {
