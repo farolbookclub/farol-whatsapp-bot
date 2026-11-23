@@ -229,9 +229,15 @@ async function aniversariosClube(sock, hoje) {
     .is('saiu_em', null)
   if (erroMembras) throw erroMembras
 
+  // entrada_texto é a data aproximada que a admin confirmou na mão (ex.:
+  // integrantes de antes do sistema, re-vinculadas no WhatsApp depois) —
+  // tem prioridade sobre entrou_em, que o autolink pode ter sobrescrito com
+  // a data da REVINCULAÇÃO em vez da entrada real (bug visto com Duda, Bel
+  // e Mariana Melo: entrada_texto dizia "agosto de 2024" mas entrou_em
+  // tinha sido reposto pra outubro de 2026 numa revinculação).
   const entrouPorSignup = new Map()
   for (const m of membrasAtivas ?? []) {
-    const data = m.entrou_em ? String(m.entrou_em).slice(0, 10) : parseEntradaAprox(m.entrada_texto)
+    const data = parseEntradaAprox(m.entrada_texto) || (m.entrou_em ? String(m.entrou_em).slice(0, 10) : null)
     if (data) entrouPorSignup.set(String(m.signup_id), data)
   }
 
