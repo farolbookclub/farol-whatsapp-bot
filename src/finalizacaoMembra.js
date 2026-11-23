@@ -41,7 +41,10 @@ export async function concluirEntradaOficial(sock, jid, signupId, formato) {
 
   try {
     await enviarMsg(sock, jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
-    await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, 'Este é o seu código de membra. Guarde, porque você vai usar no site:')
+    await enviarMsg(sock, jid, {
+      text: 'Esse é o site de membras do Farol:\nhttps://membrosfarol.vercel.app/\n\n' +
+        'Pra entrar, preencha o mesmo e-mail do seu cadastro e clique em "Esqueci minha senha" pra criar a sua.',
+    })
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
     await avisarInstagramSeTiver(sock, signupId)
     await avisarAdminEntrouOficial(signupId, formato)
