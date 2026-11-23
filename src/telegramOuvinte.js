@@ -58,16 +58,26 @@ const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
 const SESSION_FILE = '.telegram_session'
 const TIMEOUT_TRANSCRICAO_MS = 90 * 1000
 
-async function repassarMaratonaPraWebhook(texto, botoes) {
+// Antes isso falhava em silêncio (só console.error) se a chamada desse erro
+// de rede — e numa leva de várias atualizações seguidas, algumas sumiam sem
+// ninguém notar (ex.: Veronica e Julia sincronizaram, mas o aviso nunca saiu
+// nem no grupo nem no site). Agora tenta de novo 1x antes de desistir, e só
+// desiste avisando a admin, com o texto, pra poder lançar na mão.
+async function repassarMaratonaPraWebhook(texto, botoes, tentativa = 1) {
   try {
     const r = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Telegram-Bot-Api-Secret-Token': WEBHOOK_SECRET || '' },
       body: JSON.stringify({ message: { text: texto, reply_markup: { inline_keyboard: [botoes] } } }),
     })
-    if (!r.ok) console.error('webhook (maratona) respondeu', r.status, await r.text().catch(() => ''))
+    if (!r.ok) throw new Error(`webhook respondeu ${r.status}: ${await r.text().catch(() => '')}`)
   } catch (erro) {
     console.error('repassar maratona pro webhook:', erro)
+    if (tentativa < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      return repassarMaratonaPraWebhook(texto, botoes, tentativa + 1)
+    }
+    await avisarAdminErro(`Uma atualização do Maratona não foi repassada (falha de rede, 2 tentativas): "${texto.slice(0, 200)}"`)
   }
 }
 
