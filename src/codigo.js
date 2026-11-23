@@ -73,14 +73,17 @@ export async function responderPedidoCodigo(sock, jid, signupId, formato) {
     return
   }
 
-  const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
-  if (!config?.codigo_atual) return
-
   try {
-    await enviarCodigoEmDuasMensagens(sock, jid, config.codigo_atual, '🔑 Código do site de membras:')
+    await enviarMsg(sock, jid, {
+      text: '🔐 O acesso ao site de membros agora é feito com e-mail e senha, sem código de acesso!\n\n' +
+        '💗 Já é membra?\n' +
+        'Acesse: https://membrosfarol.vercel.app/\n' +
+        'Digite o e-mail usado na sua inscrição e clique em *"Esqueci minha senha"* para cadastrar uma nova.\n\n' +
+        '*Lembre-se:* não tenho acesso à sua senha nem ao e-mail cadastrado, então a redefinição precisa ser feita por você. 😊',
+    })
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
   } catch (erro) {
-    console.error(`reenviar código ${jid}:`, erro)
+    console.error(`responder pedido de código ${jid}:`, erro)
   }
 }
 

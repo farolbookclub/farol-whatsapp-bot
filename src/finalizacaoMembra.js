@@ -36,14 +36,13 @@ export async function concluirEntradaOficial(sock, jid, signupId, formato) {
   const { data: membro } = await supabase.from('whatsapp_membros').select('codigo_enviado').eq('jid', jid).maybeSingle()
   if (!membro || membro.codigo_enviado) return false
 
-  const { data: config } = await supabase.from('bot_config').select('codigo_atual').eq('id', 1).maybeSingle()
-  if (!config?.codigo_atual) return false
-
   try {
     await enviarMsg(sock, jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
     await enviarMsg(sock, jid, {
-      text: 'Esse é o site de membras do Farol:\nhttps://membrosfarol.vercel.app/\n\n' +
-        'Pra entrar, preencha o mesmo e-mail do seu cadastro e clique em "Esqueci minha senha" pra criar a sua.',
+      text: '✨ *Site das membras*\n' +
+        'https://membrosfarol.vercel.app/\n\n' +
+        'Digite o mesmo e-mail utilizado na inscrição do clube e clique em *"Esqueci minha senha"*.\n\n' +
+        'Confira sua caixa de entrada ou spam e siga as instruções recebidas para cadastrar uma nova senha. Prontinho!',
     })
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
     await avisarInstagramSeTiver(sock, signupId)

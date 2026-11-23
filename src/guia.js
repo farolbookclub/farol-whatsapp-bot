@@ -19,11 +19,12 @@ const GUIA_SITE =
   'No site, você:\n' +
   '📖 vê o livro do mês, a leitura extra e os gatilhos\n' +
   '📚 registra seu progresso e dá nota\n' +
+  '🧚🏻 personaliza suas informações\n' +
   '🗂️ consulta o histórico de leituras (⚠️ pode ter spoiler)\n' +
   '💌 envia sugestões e denúncias pelo Clubinho\n' +
   '🔎 encontra regras, encontrinhos, membras e mais\n\n' +
   '📲 Para instalar no celular, toque no ícone de download (circulado no print).\n' +
-  '🔑 Para acessar, você vai usar seu código de membra. Ele chega aqui assim que você entrar em todos os grupos, e os links vêm logo a seguir.'
+  '🔑 Assim que você entrar em todos os grupos, te digo como acessar. Os links pra entrar nos grupos vêm logo a seguir.'
 
 const GUIA_LEITURA =
   '📚 *Leitura do mês*\n' +
