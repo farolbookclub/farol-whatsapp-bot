@@ -256,7 +256,7 @@ async function handleDM(sock, m, jid) {
     const resultado = await vincularContaPorCodigo(jid, comandoCodigo[1])
     if (!resultado) return
     if (!resultado.ok) {
-      await enviarMsg(sock, jid, { text: resultado.texto })
+      if (resultado.texto) await enviarMsg(sock, jid, { text: resultado.texto })
       return
     }
     await iniciarGuia(sock, jid, resultado.apelido)
