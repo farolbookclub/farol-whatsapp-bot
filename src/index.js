@@ -488,22 +488,6 @@ async function connectToWhatsApp() {
     }
   })
 
-  // Reação também conta como interação (regra: "qualquer mensagem ou reação conta").
-  sock.ev.on('messages.reaction', async (reacoes) => {
-    for (const r of reacoes) {
-      try {
-        const groupJid = r.key?.remoteJid
-        const reactorJid = r.reaction?.key?.participant || r.reaction?.key?.remoteJid
-        if (!groupJid?.endsWith('@g.us') || !reactorJid) continue
-        if (!(await grupoAtivo(groupJid))) continue
-        if (!(await identificarTopico(groupJid))) continue
-        await registrarInteracao(reactorJid)
-      } catch (erro) {
-        console.error('reação:', erro)
-      }
-    }
-  })
-
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const m of messages) {
       if (!m.message || m.key.fromMe) continue
