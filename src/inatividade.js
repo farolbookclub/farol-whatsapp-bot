@@ -45,7 +45,7 @@ function maisRecente(...datas) {
 function textoLembrete(nome, dias, dataLimite) {
   return `Oi, ${nome}! Sentimos sua falta 💕\n` +
     `Faz ${dias} dias que você não interage no Farol. Pelas regras, quem passa 15 dias sem interagir sai do clube.\n\n` +
-    `Para continuar com a gente, é só mandar ou reagir a uma mensagem em qualquer grupo até ${dataLimite}. Até um "bom dia" já conta!`
+    `Para continuar com a gente, é só voltar a participar das conversas em qualquer grupo até ${dataLimite}.`
 }
 
 function textoRemocao(nome, limite) {

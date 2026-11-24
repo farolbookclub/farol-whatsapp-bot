@@ -150,7 +150,9 @@ async function handleGroupMessage(sock, m, groupJid) {
   const topico = await identificarTopico(groupJid)
   if (!topico) return
 
-  await registrarInteracao(participant)
+  // Reagir a uma mensagem NÃO conta como interação (Termo, Cláusulas 6 e 7).
+  // Texto, figurinha, voto em enquete (e também áudio, foto etc.) contam.
+  if (!m.message?.reactionMessage) await registrarInteracao(participant)
 
   if (m.message?.audioMessage) {
     await processarAudioGrupo(m, groupJid, topico)
@@ -488,21 +490,8 @@ async function connectToWhatsApp() {
     }
   })
 
-  // Reação também conta como interação (regra: "qualquer mensagem ou reação conta").
-  sock.ev.on('messages.reaction', async (reacoes) => {
-    for (const r of reacoes) {
-      try {
-        const groupJid = r.key?.remoteJid
-        const reactorJid = r.reaction?.key?.participant || r.reaction?.key?.remoteJid
-        if (!groupJid?.endsWith('@g.us') || !reactorJid) continue
-        if (!(await grupoAtivo(groupJid))) continue
-        if (!(await identificarTopico(groupJid))) continue
-        await registrarInteracao(reactorJid)
-      } catch (erro) {
-        console.error('reação:', erro)
-      }
-    }
-  })
+  // Reação NÃO conta como interação (Termo v1.4, Cláusulas 6 e 7) — por isso
+  // não há mais um ouvinte de 'messages.reaction' registrando interação.
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const m of messages) {

@@ -6,7 +6,7 @@ SOBRE O FAROL
 - Farol Book Club ("Farol", "Clubinho"): clube do livro de Balneário Camboriú & Camboriú (SC), desde agosto de 2024. Administrado pela Kah (Karine). Contato: farolbookclub@gmail.com.
 - Cantinho pra surtar sobre livros, bater papo, mandar foto do pet, se sentir acolhida e fazer amizades.
 - Participação 100% gratuita, no Online e no Presencial. Só para maiores de 18 anos.
-- Site de inscrição: https://biofarol.vercel.app (lá também fica o Termo de Adesão v1.2).
+- Site de inscrição: https://biofarol.vercel.app (lá também fica o Termo de Adesão v1.4).
 
 O QUE A GENTE LÊ
 - Uma ficção contemporânea por mês: romance, thriller, fantasia, comédia e afins. A curadoria é da Administração; às vezes rola enquete ou dinâmica pra escolher juntas.
@@ -34,11 +34,10 @@ SITE DAS MEMBRAS: https://membrosfarol.vercel.app/
 - Também tem: regrinhas, leituras anteriores, encontrinhos, membras (apresentação, aniversários e mais), ferramentas, arquivos e parceiros.
 
 REGRINHAS
-- Spoiler: antes de comentar algo do livro, escrever SPOILER + onde está (capítulo ou porcentagem) + o comentário, no grupo Leitura do mês. Foto ou vídeo com spoiler: mandar como visualização única. Spoiler sem aviso gera lembrete da regra; na 3ª vez a participação pode ser encerrada.
-- Conversa: interagir ao menos uma vez a cada 15 dias em algum grupo do WhatsApp (qualquer mensagem ou reação conta, até um "bom dia"). Por volta do 10º dia sem interagir, o Faroleiro manda um lembrete no privado; com 15 dias seguidos sem interagir, a pessoa é removida automaticamente e perde a vaga do Presencial. Pra voltar, é só fazer uma nova adesão pelo site.
-- Presencial: avisar sempre que for faltar. Três faltas seguidas podem fazer perder a vaga do Presencial (continua no Online).
-- Respeito acima de tudo: discordar sobre livros é normal, mas sempre com carinho e respeito, entre todas e com a Administração.
-- Situações graves (ameaça, assédio, discriminação, exposição de dados) podem levar à remoção imediata.
+- Respeito entre divas: desrespeito, ofensas, ameaças, assédio, perseguição ou discriminação não serão tolerados e levarão à suspensão e desligamento do clube. Discordar sobre livros é normal, sempre com respeito, entre todas e com a Administração. Situações graves (como exposição de dados) podem levar à remoção imediata.
+- Alerta de spoiler: sempre avise antes de comentar um spoiler, indicando onde ele acontece (ex.: "SPOILER – cap. X"), no grupo Leitura do mês. Fotos, áudios e vídeos com spoilers devem ser enviados como visualização única. Spoiler sem aviso gera lembrete da regra; na 3ª vez a participação pode ser encerrada.
+- Conversa: participe de pelo menos um dos grupos do WhatsApp a cada 15 dias (reagir a uma mensagem não conta como interação). Por volta do 10º dia sem interagir, o Faroleiro manda um lembrete no privado; ficar 15 dias seguidos sem interagir gera remoção automática do clube. Pra voltar, é só fazer uma nova adesão pelo site.
+- Participe dos encontros (Presencial): avisar sempre que for faltar. Três faltas consecutivas liberam a vaga presencial para outra pessoa.
 
 APRESENTAÇÃO
 - Quem quiser pode se apresentar no Bate-papo: nome e de onde é, livro favorito, se tem pets, o que gosta de fazer nas horas vagas.
