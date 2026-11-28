@@ -11,6 +11,36 @@ export async function enviarCodigoEmDuasMensagens(sock, jid, codigo, textoIntro)
   await enviarMsg(sock, jid, { text: `*${codigo}*` })
 }
 
+// Conta individual é criada por um gatilho do banco quando ela entra
+// oficialmente (provisionar-acesso-membra), que guarda a senha em
+// membras.senha_provisoria pra mandar aqui. Se ainda não tiver rodado (corrida
+// rara), cai no fluxo antigo de "esqueci minha senha".
+async function textoAcessoSite(signupId) {
+  const { data: m } = await supabase
+    .from('membras')
+    .select('senha_provisoria, signups(email)')
+    .eq('signup_id', signupId)
+    .maybeSingle()
+  const email = m?.signups?.email
+  const senha = m?.senha_provisoria
+  if (email && senha) {
+    await supabase.from('membras').update({ senha_provisoria: null }).eq('signup_id', signupId)
+    return (
+      '✨ *Site das membras*\n' +
+      '🌐 Acesse: https://membrosfarol.vercel.app/\n\n' +
+      `E-mail: ${email}\n` +
+      `Senha: ${senha}\n\n` +
+      'Se quiser mudar a senha, é só clicar em "Esqueci minha senha"'
+    )
+  }
+  return (
+    '✨ *Site das membras*\n' +
+    'https://membrosfarol.vercel.app/\n\n' +
+    'Digite o mesmo e-mail utilizado na inscrição do clube e clique em *"Esqueci minha senha"*.\n\n' +
+    'Confira sua caixa de entrada ou spam e siga as instruções recebidas para cadastrar uma nova senha. Prontinho!'
+  )
+}
+
 async function avisarInstagramSeTiver(sock, signupId) {
   const { data: s } = await supabase.from('signups').select('apelido, nome, instagram').eq('id', signupId).maybeSingle()
   if (!s) return
@@ -38,12 +68,7 @@ export async function concluirEntradaOficial(sock, jid, signupId, formato) {
 
   try {
     await enviarMsg(sock, jid, { text: 'Pronto, agora você faz parte do Farol! 🎀 Seja muito bem-vinda 💖' })
-    await enviarMsg(sock, jid, {
-      text: '✨ *Site das membras*\n' +
-        'https://membrosfarol.vercel.app/\n\n' +
-        'Digite o mesmo e-mail utilizado na inscrição do clube e clique em *"Esqueci minha senha"*.\n\n' +
-        'Confira sua caixa de entrada ou spam e siga as instruções recebidas para cadastrar uma nova senha. Prontinho!',
-    })
+    await enviarMsg(sock, jid, { text: await textoAcessoSite(signupId) })
     await supabase.from('whatsapp_membros').update({ codigo_enviado: true }).eq('jid', jid)
     await avisarInstagramSeTiver(sock, signupId)
     await avisarAdminEntrouOficial(signupId, formato)
